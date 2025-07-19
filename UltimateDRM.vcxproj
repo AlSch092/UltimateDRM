@@ -22,8 +22,11 @@
     <ClCompile Include="src\LicenseManager.cpp" />
     <ClCompile Include="src\Logger.cpp" />
     <ClCompile Include="src\NAuthenticode.cpp" />
+    <ClCompile Include="src\Process.cpp" />
     <ClCompile Include="src\remap.cpp" />
+    <ClCompile Include="src\Services.cpp" />
     <ClCompile Include="src\UltimateDRM.cpp" />
+    <ClCompile Include="src\Utility.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\curl\curl.h" />
@@ -44,8 +47,11 @@
     <ClInclude Include="include\Logger.hpp" />
     <ClInclude Include="include\MapProtectedClass.hpp" />
     <ClInclude Include="include\NAuthenticode.hpp" />
+    <ClInclude Include="include\Process.hpp" />
     <ClInclude Include="include\remap.hpp" />
+    <ClInclude Include="include\Services.hpp" />
     <ClInclude Include="include\Settings.hpp" />
+    <ClInclude Include="include\Utility.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="lib\brotlicommon.lib" />
@@ -108,6 +114,9 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetName>UltimateDRM-d</TargetName>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>

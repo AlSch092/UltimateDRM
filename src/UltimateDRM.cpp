@@ -4,10 +4,10 @@
 #include "../include/DRM.hpp"
 #include "../include/Settings.hpp"
 #include "../include/MapProtectedClass.hpp"
-#include "../include/NAuthenticode.hpp"
 #include "../include/remap.hpp"
 #include "../include/Logger.hpp"
 #include "../include/LicenseManager.hpp"
+#include "../include/Process.hpp"
 
 #pragma comment(linker, "/ALIGN:0x10000") //for section remapping
 
@@ -26,7 +26,8 @@ struct DRM::Impl
 
 	Impl(const bool bAllowOfflineUsage, 
 		const bool bUsingLicensing, 
-		const bool bCheckHypervisor, 
+		const bool bCheckHypervisor,
+		const bool bRequireCodeSigning,
 		const std::list<std::wstring> lAllowedParents)
 	{
 		this->ProtectedSettings = new ProtectedMemory(sizeof(Settings));
@@ -41,6 +42,7 @@ struct DRM::Impl
 		Settings::Instance = this->ProtectedSettings->Construct<Settings>(
 			bAllowOfflineUsage,
 			bUsingLicensing,
+			bRequireCodeSigning,
 			bEnforceSecureBoot,
 			bEnforceDSE,
 			bEnforceNoKDbg,
@@ -52,7 +54,7 @@ struct DRM::Impl
 
 		try
 		{
-			this->ProtectedSettings->Protect();
+			this->ProtectedSettings->Protect(); //remap the protected memory to prevent tampering (this doesn't call DRM::Protect)
 		}
 		catch (const std::runtime_error& ex)
 		{
@@ -67,23 +69,43 @@ struct DRM::Impl
 	}
 };
 
-DRM::DRM(const bool bAllowOfflineUsage, const bool bUsingLicensing, const bool bCheckHypervisor, const std::list<std::wstring> lAllowedParents) : pImpl(new DRM::Impl(bAllowOfflineUsage, bUsingLicensing, bCheckHypervisor, lAllowedParents))
+DRM::DRM(const bool bAllowOfflineUsage, const bool bUsingLicensing, const bool bCheckHypervisor, const bool bRequireCodeSigning, const std::list<std::wstring> lAllowedParents) 
+	: pImpl(new DRM::Impl(bAllowOfflineUsage, bUsingLicensing, bCheckHypervisor, bRequireCodeSigning, lAllowedParents))
 {
 }
 
 bool DRM::Protect()
 {
-	//add other integrity check setup here...
-
-#ifndef _DEBUG
 	if (Settings::Instance->bCheckIntegrity)
 	{
+#ifndef _DEBUG
 		if (!RmpRemapImage((ULONG_PTR)GetModuleHandle(NULL)))
 		{
 			throw std::runtime_error("Failed to remap program sections");
 		}
-	}
 #endif
+	}
+
+	if (Settings::Instance->bRequireCodeSigning)
+	{
+		std::wstring currentProcName = Process::GetProcessName(GetCurrentProcessId());
+		std::wstring processDirectory = Services::GetProcessDirectoryW(GetCurrentProcessId());
+		std::wstring fullProcessPath = (processDirectory + currentProcName);
+
+		if (!currentProcName.empty() && !processDirectory.empty())
+		{
+			std::wcout << L"Checking code signature of: " << fullProcessPath << std::endl;
+
+			if (!Authenticode::HasSignature(fullProcessPath.c_str(), TRUE)) //check if the current process has a valid signature
+			{
+				return false;
+			}
+		}
+		else
+		{
+			throw std::runtime_error("Failed to get current process name");
+		}
+	}
 
 	return true;
 }

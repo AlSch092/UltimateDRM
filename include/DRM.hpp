@@ -4,7 +4,12 @@
 class DRM 
 {
 public:
-	explicit DRM(const bool bAllowOfflineUsage, const bool bUsingLicensing, const bool bCheckHypervisor, const std::list<std::wstring> lAllowedParents);
+	explicit DRM(const bool bAllowOfflineUsage, 
+		const bool bUsingLicensing, 
+		const bool bCheckHypervisor, 
+		const bool bRequireCodeSigning, 
+		const std::list<std::wstring> lAllowedParents);
+
 	bool Protect();
 
 	DRM(DRM&&) = delete;

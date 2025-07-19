@@ -12,6 +12,7 @@ public:
 	static Settings* CreateInstance(
 		const bool bAllowOfflineUsage,
 		const bool bUsingLicensing,
+		const bool bRequireCodeSigning,
 		const bool bEnforceSecureBoot,
 		const bool bEnforceDSE,
 		const bool bEnforceNoKDbg,
@@ -28,6 +29,7 @@ public:
 			Instance = new Settings(
 				bAllowOfflineUsage,
 				bUsingLicensing,
+				bRequireCodeSigning,
 				bEnforceSecureBoot,
 				bEnforceDSE,
 				bEnforceNoKDbg,
@@ -46,6 +48,7 @@ public:
 	Settings& operator=(const Settings&) = delete;
 
 	bool bAllowOfflineUsage;
+	bool bRequireCodeSigning;
 	bool bEnforceSecureBoot;
 	bool bEnforceDSE;
 	bool bEnforceNoKDbg;
@@ -61,6 +64,7 @@ public:
 	Settings(
 		const bool bAllowOfflineUsage,
 		const bool bUsingLicensing,
+		const bool bRequireCodeSigning,
 		const bool bEnforceSecureBoot,
 		const bool bEnforceDSE,
 		const bool bEnforceNoKDbg,
@@ -69,7 +73,7 @@ public:
 		const bool bCheckHypervisor,
 		const bool bRequireRunAsAdministrator,
 		const std::list<std::wstring> allowedParents)
-		: bAllowOfflineUsage(bAllowOfflineUsage), bUsingLicensing(bUsingLicensing), bEnforceSecureBoot(bEnforceSecureBoot), bEnforceDSE(bEnforceDSE), bEnforceNoKDbg(bEnforceNoKDbg), bUseAntiDebugging(bUseAntiDebugging), bCheckIntegrity(bCheckIntegrity), bCheckHypervisor(bCheckHypervisor), bRequireRunAsAdministrator(bRequireRunAsAdministrator), allowedParents(allowedParents)
+		: bAllowOfflineUsage(bAllowOfflineUsage), bUsingLicensing(bUsingLicensing), bRequireCodeSigning(bRequireCodeSigning), bEnforceSecureBoot(bEnforceSecureBoot), bEnforceDSE(bEnforceDSE), bEnforceNoKDbg(bEnforceNoKDbg), bUseAntiDebugging(bUseAntiDebugging), bCheckIntegrity(bCheckIntegrity), bCheckHypervisor(bCheckHypervisor), bRequireRunAsAdministrator(bRequireRunAsAdministrator), allowedParents(allowedParents)
 	{
 		if (Instance != nullptr) //since we can't use a private constructor with ProtectedMemory class, we need to check if the instance is already created
 		{

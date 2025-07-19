@@ -9,6 +9,9 @@
 
 #define ENCODING (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING)
 
+#pragma comment(lib, "wintrust.lib")
+#pragma comment(lib, "crypt32.lib")
+
 using namespace std;
 
 typedef struct
