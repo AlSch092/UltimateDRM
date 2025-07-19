@@ -23,6 +23,7 @@ int main()
 	else
 	{
 		std::cout << "Failed to apply DRM protection.\n";
+		return -1;
 	}
 
 	//TEST: Check if sections page protections can be changed after remap
