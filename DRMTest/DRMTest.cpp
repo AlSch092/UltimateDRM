@@ -1,5 +1,5 @@
 // DRMTest.cpp : This file contains the 'main' function. Program execution begins and ends there.
-// Testing features of the UltimateDRM library
+//
 
 #include <iostream>
 #include <Windows.h>
@@ -13,8 +13,9 @@ int main()
 	const bool bAllowOfflineUsage = true;
 	const bool bUsingLicensing = true;
 	const bool bEnforceHypervisorCheck = true;
+	const bool bRequireCodeSigning = true;
 
-	DRM* drm = new DRM(bAllowOfflineUsage, bUsingLicensing, bEnforceHypervisorCheck, lAllowedParents);
+	DRM* drm = new DRM(bAllowOfflineUsage, bUsingLicensing, bEnforceHypervisorCheck, bRequireCodeSigning, lAllowedParents);
 
 	if (drm->Protect())
 	{
@@ -22,7 +23,7 @@ int main()
 	}
 	else
 	{
-		std::cout << "Failed to apply DRM protection.\n";
+		std::cout << "Failed to apply DRM protection.\n"; //this may trigger if our test .exe isn't code signed
 		return -1;
 	}
 
