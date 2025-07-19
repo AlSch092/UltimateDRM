@@ -1,0 +1,123 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{b788eca0-0c01-40ed-9918-c0a68bdcffa7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include">
+      <UniqueIdentifier>{fd6899e9-512f-497a-a8ee-3fafb0188548}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lib">
+      <UniqueIdentifier>{f2ea6de6-36de-4ed6-ab6a-7ec7853d6089}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\curl">
+      <UniqueIdentifier>{e39288ba-a2ed-4ce5-9868-b009c5153a7a}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\UltimateDRM.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Logger.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\remap.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\NAuthenticode.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\LicenseManager.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\Settings.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Logger.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\MapProtectedClass.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\remap.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NAuthenticode.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DRM.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\LicenseManager.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\curl\curl.h">
+      <Filter>include\curl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\curl\curlver.h">
+      <Filter>include\curl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\curl\easy.h">
+      <Filter>include\curl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\curl\header.h">
+      <Filter>include\curl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\curl\mprintf.h">
+      <Filter>include\curl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\curl\multi.h">
+      <Filter>include\curl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\curl\options.h">
+      <Filter>include\curl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\curl\stdcheaders.h">
+      <Filter>include\curl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\curl\system.h">
+      <Filter>include\curl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\curl\typecheck-gcc.h">
+      <Filter>include\curl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\curl\urlapi.h">
+      <Filter>include\curl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\curl\websockets.h">
+      <Filter>include\curl</Filter>
+    </ClInclude>
+    <ClInclude Include="include\HttpClient.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="lib\brotlicommon.lib">
+      <Filter>lib</Filter>
+    </Library>
+    <Library Include="lib\brotlidec.lib">
+      <Filter>lib</Filter>
+    </Library>
+    <Library Include="lib\brotlienc.lib">
+      <Filter>lib</Filter>
+    </Library>
+    <Library Include="lib\libcurl.lib">
+      <Filter>lib</Filter>
+    </Library>
+    <Library Include="lib\libcurl-d.lib">
+      <Filter>lib</Filter>
+    </Library>
+    <Library Include="lib\zlib.lib">
+      <Filter>lib</Filter>
+    </Library>
+    <Library Include="lib\zlibd.lib">
+      <Filter>lib</Filter>
+    </Library>
+  </ItemGroup>
+</Project>
