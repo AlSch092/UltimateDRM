@@ -1,5 +1,6 @@
 // UltimateDRM.cpp : Defines the functions for the static library.
 // C++ 14 is being used to help compatability with older projects
+// This project aims to take the good parts of UltimateAnticheat while improving the parts which were messy or implemented poorly
 
 #include "../include/DRM.hpp"
 #include "../include/Settings.hpp"
@@ -7,7 +8,7 @@
 #include "../include/remap.hpp"
 #include "../include/Logger.hpp"
 #include "../include/LicenseManager.hpp"
-#include "../include/Process.hpp"
+#include "../include/Integrity.hpp"
 
 #pragma comment(linker, "/ALIGN:0x10000") //for section remapping
 
@@ -23,6 +24,8 @@ Settings* Settings::Instance = nullptr; //singleton static instance decl to avoi
 struct DRM::Impl
 {
 	ProtectedMemory* ProtectedSettings = nullptr;
+
+	Integrity* IntegrityChecker = nullptr; //integrity checker for the current process
 
 	Impl(const bool bAllowOfflineUsage, 
 		const bool bUsingLicensing, 
@@ -60,6 +63,8 @@ struct DRM::Impl
 		{
 			throw std::runtime_error("Could not create protected memory for DRM settings");
 		}
+
+		this->IntegrityChecker = new Integrity();
 	}
 
 	~Impl() 
@@ -74,6 +79,21 @@ DRM::DRM(const bool bAllowOfflineUsage, const bool bUsingLicensing, const bool b
 {
 }
 
+
+/**
+ * @brief Launches the DRM protection checks
+ *
+ * This function launches various DRM protections based on the settings provided
+ *
+ * @return true/false if the checks ran successfully
+ *
+ * @details If return false, one of the checks failed, and the program cannot continue running since security cannot be guaranteed
+ *
+ *  @example DRMTest.cpp
+ *
+ * @usage
+ * try { drm->Protect(); } catch(std::runtime_error& ex) { std::cerr << "DRM protection failed: " << ex.what() << std::endl; }
+ */
 bool DRM::Protect()
 {
 	if (Settings::Instance->bCheckIntegrity)
@@ -84,6 +104,15 @@ bool DRM::Protect()
 			throw std::runtime_error("Failed to remap program sections");
 		}
 #endif
+
+		uint64_t moduleChecksum = Integrity::CalculateChecksum(GetModuleHandle(NULL));
+
+		if (moduleChecksum == 0)
+		{
+			throw std::runtime_error("Failed to calculate module checksum");
+		}
+
+		this->pImpl->IntegrityChecker->StoreModuleChecksum(GetModuleHandle(NULL), moduleChecksum); //tested and working
 	}
 
 	if (Settings::Instance->bRequireCodeSigning)

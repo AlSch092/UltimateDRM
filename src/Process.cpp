@@ -90,7 +90,7 @@ list<ProcessData::Section*> Process::GetSections(__in const string module)
     list<ProcessData::Section*> Sections;
 
     PIMAGE_SECTION_HEADER sectionHeader;
-    HINSTANCE hInst = NULL;  
+    HMODULE hInst = NULL;  
     PIMAGE_DOS_HEADER pDoH;
     PIMAGE_NT_HEADERS64 pNtH;
 

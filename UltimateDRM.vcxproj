@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\Integrity.cpp" />
     <ClCompile Include="src\LicenseManager.cpp" />
     <ClCompile Include="src\Logger.cpp" />
     <ClCompile Include="src\NAuthenticode.cpp" />
@@ -43,6 +44,7 @@
     <ClInclude Include="include\curl\websockets.h" />
     <ClInclude Include="include\DRM.hpp" />
     <ClInclude Include="include\HttpClient.hpp" />
+    <ClInclude Include="include\Integrity.hpp" />
     <ClInclude Include="include\LicenseManager.hpp" />
     <ClInclude Include="include\Logger.hpp" />
     <ClInclude Include="include\MapProtectedClass.hpp" />

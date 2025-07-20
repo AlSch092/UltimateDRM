@@ -43,6 +43,9 @@
     <ClCompile Include="src\Utility.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Integrity.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Settings.hpp">
@@ -112,6 +115,9 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="include\Utility.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Integrity.hpp">
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
