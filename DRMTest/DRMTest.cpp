@@ -5,7 +5,11 @@
 #include <Windows.h>
 #include "../include/DRM.hpp"
 
+#ifdef _DEBUG
+#pragma comment(lib, "../x64/Debug/UltimateDRM-d.lib")
+#else
 #pragma comment(lib, "../x64/Release/UltimateDRM.lib")
+#endif
 
 int main()
 {
@@ -13,17 +17,25 @@ int main()
 	const bool bAllowOfflineUsage = true;
 	const bool bUsingLicensing = true;
 	const bool bEnforceHypervisorCheck = true;
-	const bool bRequireCodeSigning = true;
+	const bool bRequireCodeSigning = false; //in production code, this should be set to true
 
 	DRM* drm = new DRM(bAllowOfflineUsage, bUsingLicensing, bEnforceHypervisorCheck, bRequireCodeSigning, lAllowedParents);
 
-	if (drm->Protect())
+	try
 	{
-		std::cout << "DRM protection applied successfully.\n";
+		if (drm->Protect())
+		{
+			std::cout << "DRM protection applied successfully.\n";
+		}
+		else
+		{
+			std::cout << "Failed to apply DRM protection.\n"; //this may trigger if our test .exe isn't code signed
+			return -1;
+		}
 	}
-	else
+	catch (const std::runtime_error& ex)
 	{
-		std::cout << "Failed to apply DRM protection.\n"; //this may trigger if our test .exe isn't code signed
+		std::cerr << "Error during DRM protection: " << ex.what() << std::endl;
 		return -1;
 	}
 
@@ -45,7 +57,7 @@ int main()
 
 	delete drm;
 
-	std::cout << "Closing program...\n";
+	std::cout << "Closing DRM Test program...\n";
 
 	return 0;
 }
