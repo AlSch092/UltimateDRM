@@ -14,12 +14,14 @@
 int main()
 {
 	std::list<std::wstring> lAllowedParents = { L"steam.exe", L"explorer.exe" };
+
+	const std::string LicenseServerEndpoint = "https://example.com/api/license"; //replace with your actual license server endpoint
 	const bool bAllowOfflineUsage = true;
 	const bool bUsingLicensing = true;
 	const bool bEnforceHypervisorCheck = true;
 	const bool bRequireCodeSigning = false; //in production code, this should be set to true
 
-	DRM* drm = new DRM(bAllowOfflineUsage, bUsingLicensing, bEnforceHypervisorCheck, bRequireCodeSigning, lAllowedParents);
+	DRM* drm = new DRM(LicenseServerEndpoint, bAllowOfflineUsage, bUsingLicensing, bEnforceHypervisorCheck, bRequireCodeSigning, lAllowedParents);
 
 	try
 	{
