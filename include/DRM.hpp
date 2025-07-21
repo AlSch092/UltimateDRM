@@ -1,10 +1,15 @@
 #pragma once
 #include "Settings.hpp"
 
+/*
+    The PIMPL idiom hides implementation details for static libraries. The actual implementation and members of the class are in DRM.cpp
+*/
 class DRM 
 {
 public:
-	explicit DRM(const bool bAllowOfflineUsage, 
+	explicit DRM(
+		const std::string& LicenseServerEndpoint,
+		const bool bAllowOfflineUsage, 
 		const bool bUsingLicensing, 
 		const bool bCheckHypervisor, 
 		const bool bRequireCodeSigning, 

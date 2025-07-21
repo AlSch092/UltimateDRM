@@ -26,6 +26,7 @@
     <ClCompile Include="src\Process.cpp" />
     <ClCompile Include="src\remap.cpp" />
     <ClCompile Include="src\Services.cpp" />
+    <ClCompile Include="src\Thread.cpp" />
     <ClCompile Include="src\UltimateDRM.cpp" />
     <ClCompile Include="src\Utility.cpp" />
   </ItemGroup>
@@ -45,6 +46,8 @@
     <ClInclude Include="include\DRM.hpp" />
     <ClInclude Include="include\HttpClient.hpp" />
     <ClInclude Include="include\Integrity.hpp" />
+    <ClInclude Include="include\json\json.hpp" />
+    <ClInclude Include="include\json\json_fwd.hpp" />
     <ClInclude Include="include\LicenseManager.hpp" />
     <ClInclude Include="include\Logger.hpp" />
     <ClInclude Include="include\MapProtectedClass.hpp" />
@@ -53,7 +56,9 @@
     <ClInclude Include="include\remap.hpp" />
     <ClInclude Include="include\Services.hpp" />
     <ClInclude Include="include\Settings.hpp" />
+    <ClInclude Include="include\Thread.hpp" />
     <ClInclude Include="include\Utility.hpp" />
+    <ClInclude Include="include\XorStr.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="lib\brotlicommon.lib" />

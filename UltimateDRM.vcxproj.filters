@@ -17,6 +17,9 @@
     <Filter Include="include\curl">
       <UniqueIdentifier>{e39288ba-a2ed-4ce5-9868-b009c5153a7a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\json">
+      <UniqueIdentifier>{f467d9d0-9400-46b7-9677-1360352c1e3a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\UltimateDRM.cpp">
@@ -44,6 +47,9 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\Integrity.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Thread.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
@@ -118,6 +124,18 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="include\Integrity.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\json\json.hpp">
+      <Filter>include\json</Filter>
+    </ClInclude>
+    <ClInclude Include="include\json\json_fwd.hpp">
+      <Filter>include\json</Filter>
+    </ClInclude>
+    <ClInclude Include="include\XorStr.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Thread.hpp">
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>

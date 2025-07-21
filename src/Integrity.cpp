@@ -95,3 +95,45 @@ bool Integrity::CompareChecksum(HMODULE hMod, uint64_t checksum)
 	uint64_t calculatedChecksum = CalculateChecksum(hMod);
 	return (calculatedChecksum == checksum);
 }
+
+/**
+ * @brief Thread routine for periodic integrity checks
+ *
+ * This function computes the checksum of modules and compares it to
+ * the checksums grabbed at program startup. Runs continuously
+ *
+ * @param classThisPtr Pointer to an Integrity class object
+ * 
+ * @return No return value
+ *
+ * @details if checksums don't match, throws std::runtime_error
+ *
+ *  @example 
+ *
+ * @usage
+ * PeriodicIntegrityCheckThread = std::make_unique<Thread>(PeriodicIntegrityCheck, nullptr, true, false);
+ */
+void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
+{
+	if (classThisPtr == nullptr)
+	{
+		throw std::runtime_error("PeriodicIntegrityCheck called with null classThisPtr");
+	}
+
+	Integrity* integrity = reinterpret_cast<Integrity*>(classThisPtr);
+
+	bool checking = true;
+	
+	while (checking)
+	{
+		uint64_t checksum_main = Integrity::CalculateChecksum(GetModuleHandle(NULL));
+
+		if (checksum_main != integrity->ModuleChecksums[GetModuleHandle(NULL)])
+		{
+			//optionally, log to a remote server
+			throw std::runtime_error("Integrity check failed: main module checksum mismatch");
+		}
+
+		this_thread::sleep_for(std::chrono::seconds(10));
+	}
+}

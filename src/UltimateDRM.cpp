@@ -25,9 +25,12 @@ struct DRM::Impl
 {
 	ProtectedMemory* ProtectedSettings = nullptr;
 
-	Integrity* IntegrityChecker = nullptr; //integrity checker for the current process
+	std::unique_ptr<Integrity> IntegrityChecker = nullptr; //integrity checker for the current process
 
-	Impl(const bool bAllowOfflineUsage, 
+	std::unique_ptr<LicenseManager> LicenseManagerPtr = nullptr; //license manager for the current process
+
+	Impl(const std::string& LicenseServerEndpoint,
+		const bool bAllowOfflineUsage, 
 		const bool bUsingLicensing, 
 		const bool bCheckHypervisor,
 		const bool bRequireCodeSigning,
@@ -64,7 +67,19 @@ struct DRM::Impl
 			throw std::runtime_error("Could not create protected memory for DRM settings");
 		}
 
-		this->IntegrityChecker = new Integrity();
+		try
+		{
+			if (Settings::Instance->bUsingLicensing)
+			{
+				this->LicenseManagerPtr = std::make_unique<LicenseManager>(LicenseServerEndpoint, Settings::Instance->bAllowOfflineUsage, "license.json");
+			}
+
+			this->IntegrityChecker = std::make_unique<Integrity>();
+		}
+		catch (const std::runtime_error& ex)
+		{
+			throw std::runtime_error("Could not initialize smart ptrs: " + std::string(ex.what()));
+		}
 	}
 
 	~Impl() 
@@ -74,8 +89,8 @@ struct DRM::Impl
 	}
 };
 
-DRM::DRM(const bool bAllowOfflineUsage, const bool bUsingLicensing, const bool bCheckHypervisor, const bool bRequireCodeSigning, const std::list<std::wstring> lAllowedParents) 
-	: pImpl(new DRM::Impl(bAllowOfflineUsage, bUsingLicensing, bCheckHypervisor, bRequireCodeSigning, lAllowedParents))
+DRM::DRM(const std::string& LicenseServerEndpoint, const bool bAllowOfflineUsage, const bool bUsingLicensing, const bool bCheckHypervisor, const bool bRequireCodeSigning, const std::list<std::wstring> lAllowedParents)
+	: pImpl(new DRM::Impl(LicenseServerEndpoint, bAllowOfflineUsage, bUsingLicensing, bCheckHypervisor, bRequireCodeSigning, lAllowedParents))
 {
 }
 
@@ -96,6 +111,54 @@ DRM::DRM(const bool bAllowOfflineUsage, const bool bUsingLicensing, const bool b
  */
 bool DRM::Protect()
 {
+	if (Settings::Instance->bUsingLicensing)
+	{
+		if (this->pImpl->LicenseManagerPtr == nullptr)
+		{
+			throw std::runtime_error("LicenseManagerPtr is not initialized");
+		}
+
+		if (!this->pImpl->LicenseManagerPtr->VerifyLicense())
+		{
+			throw std::runtime_error("License verification failed");
+		}
+	}
+
+	if (!Settings::Instance->allowedParents.empty())
+	{
+		bool verifiedParent = false;
+		DWORD parentPid = Process::GetParentProcessId();
+
+		for (std::wstring parent : Settings::Instance->allowedParents) 	//check parent process name, then check code signing cert
+		{
+			std::wstring parentProcName = Process::GetProcessName(parentPid);
+
+			if (parentProcName != parent)
+				continue;
+
+			std::wstring parentProcDirectory = Services::GetProcessDirectoryW(parentPid);
+
+			if (Settings::Instance->bRequireCodeSigning)
+			{
+				if (!Authenticode::HasSignature(std::wstring(parentProcDirectory + parentProcName).c_str(), TRUE))
+				{
+					throw std::runtime_error("Parent process was not code signed, possible imposter");
+				}
+				else
+				{
+					verifiedParent = true;
+					break;
+				}				
+			}
+			else
+			{
+				verifiedParent = true;
+				break; //if we don't require code signing, just check the process name
+			}
+
+		}
+	}
+
 	if (Settings::Instance->bCheckIntegrity)
 	{
 #ifndef _DEBUG
@@ -113,6 +176,8 @@ bool DRM::Protect()
 		}
 
 		this->pImpl->IntegrityChecker->StoreModuleChecksum(GetModuleHandle(NULL), moduleChecksum); //tested and working
+
+
 	}
 
 	if (Settings::Instance->bRequireCodeSigning)
