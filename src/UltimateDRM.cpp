@@ -102,6 +102,8 @@ struct DRM::Impl
 		 this->ProtectedSettings->Reset();
 		 delete this->ProtectedSettings;
 	}
+
+	bool StopMultipleProcessInstances();
 };
 
 DRM::DRM(const std::string& LicenseServerEndpoint, const bool bAllowOfflineUsage, const bool bUsingLicensing, const bool bCheckHypervisor, const bool bRequireCodeSigning, const std::list<std::wstring> lAllowedParents)
@@ -126,6 +128,14 @@ DRM::DRM(const std::string& LicenseServerEndpoint, const bool bAllowOfflineUsage
  */
 bool DRM::Protect()
 {
+	if (!this->pImpl->StopMultipleProcessInstances()) //prevent multiple client instances by using shared memory-mapped region
+	{
+#ifdef LOGGING_ENABLED
+		Logger::logf(Err, "Could not initialize program: shared memory check failed, make sure only one instance of the program is open. Shutting down.");
+#endif
+		terminate();
+	}
+
 	if (Settings::Instance->bUsingLicensing)
 	{
 		if (this->pImpl->LicenseManagerPtr == nullptr)
@@ -143,8 +153,6 @@ bool DRM::Protect()
 	{
 		bool verifiedParent = false;
 		DWORD parentPid = Process::GetParentProcessId();
-
-		printf("parentPid: %d\n", parentPid);
 
 		for (std::wstring parent : Settings::Instance->allowedParents) 	//check parent process name, then check code signing cert
 		{
@@ -169,7 +177,6 @@ bool DRM::Protect()
 			}
 			else
 			{
-				printf("verifiedParent = true\n");
 				verifiedParent = true;
 				break; //if we don't require code signing, just check the process name
 			}
@@ -222,6 +229,54 @@ bool DRM::Protect()
 	return true;
 }
 
+/**
+ * @brief Maps a shared memory region with name "UDRM" to prevent multiple instances of the program
+ *
+ * This function checks if the shared memory region is already mapped, and if so, it returns false to indicate that another instance is already running.
+ *
+ * @return true if the shared memory region was successfully created and mapped, false if another instance is already running
+ *
+ * @details 
+ *
+ *  @example UltimateDRM.cpp
+ *
+ * @usage
+ * this->pImpl->StopMultipleProcessInstances();
+ */
+bool DRM::Impl::StopMultipleProcessInstances()
+{
+	HANDLE hSharedMemory = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(int), "UDRM");
+
+	if (hSharedMemory == NULL)
+	{
+#ifdef LOGGING_ENABLED
+		Logger::logf(Err, "Failed to create shared memory. Error code: %lu\n", GetLastError());
+#endif
+		return false;
+	}
+
+	int* pIsRunning = (int*)MapViewOfFile(hSharedMemory, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(int));
+
+	if (pIsRunning == NULL)
+	{
+#ifdef LOGGING_ENABLED
+		Logger::logf(Err, "Failed to map view of file. Error code : % lu\n", GetLastError());
+#endif
+		CloseHandle(hSharedMemory);
+		return false;
+	}
+
+	if (*pIsRunning == 1) //duplicate instance found, these instructions can be obfuscated if desired
+	{
+		UnmapViewOfFile(pIsRunning);
+		CloseHandle(hSharedMemory);
+		return false;
+	}
+
+	*pIsRunning = 1;
+
+	return true;
+}
 
 /**
  * @brief TLS callback
@@ -257,12 +312,6 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 			bFirstProcessAttach = false;
 
 			WinVersion = Services::GetWindowsVersion();
-
-			//if (!Preventions::StopMultipleProcessInstances()) //prevent multi-clients by using shared memory-mapped region
-			//{
-			//	Logger::logf(Err, "Could not initialize program: shared memory check failed, make sure only one instance of the program is open. Shutting down.");
-			//	terminate();
-			//}
 
 			SetUnhandledExceptionFilter(g_VectoredExceptionHandler);
 
@@ -315,3 +364,4 @@ LONG WINAPI g_VectoredExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo)
 #endif
 	return EXCEPTION_CONTINUE_SEARCH;
 }
+
