@@ -22,8 +22,12 @@ jobs:
 
     - name: Run DRMTest.exe and capture output
       run: |
-        ./x64/Release/DRMTest.exe > output.log
-
+       ./x64/Release/DRMTest.exe > output.log 2>&1
+        exit_code=$?
+        echo "Exit code: $exit_code"
+        type output.log
+        exit $exit_code
+        
     - name: Upload DRMTest output
       uses: actions/upload-artifact@v4
       with:
