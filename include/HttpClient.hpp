@@ -7,16 +7,6 @@
 #include "curl/easy.h"
 #include "Logger.hpp"
 
-#ifdef _DEBUG
-#pragma comment(lib, "../lib/libcurl-d.lib") //debug build doesnt use static libraries, still requires libcurl.dll in .exe folder
-#else
-#pragma comment(lib, "../lib/brotlicommon.lib")
-#pragma comment(lib, "../lib/libcurl.lib") //located in project root folder
-#pragma comment(lib, "../lib/brotlidec.lib")
-#pragma comment(lib, "../lib/brotlienc.lib") //statically linked libs to not require external .dlls to run .exe (libcurl and zlib.dll arent signed)
-#pragma comment(lib, "../lib/zlib.lib")
-#endif
-
 using namespace std;
 
 struct MemoryStruct

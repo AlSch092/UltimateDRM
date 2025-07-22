@@ -175,7 +175,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalDependencies>ntdll.lib;wintrust.lib;</AdditionalDependencies>
+      <AdditionalDependencies>ntdll.lib;wintrust.lib;"lib/libcurl-d.lib";</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -198,7 +198,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalDependencies>ntdll.lib;wintrust.lib;</AdditionalDependencies>
+      <AdditionalDependencies>ntdll.lib;wintrust.lib;ws2_32.lib;lib/zlib.lib;lib/libcurl.lib;lib/brotlicommon.lib;lib/brotlidec.lib;lib/brotlienc.lib</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
