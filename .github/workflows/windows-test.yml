@@ -21,12 +21,12 @@ jobs:
       run: msbuild UltimateDRM.sln /p:Configuration=Release /p:Platform=x64
 
     - name: Run DRMTest.exe and capture output
+      shell: pwsh
       run: |
-       ./x64/Release/DRMTest.exe > output.log 2>&1
-        exit_code=$?
-        echo "Exit code: $exit_code"
-        type output.log
-        exit $exit_code
+       ./x64/Release/DRMTest.exe *>&1 | Tee-Object -FilePath output.log
+       $exitCode = $LASTEXITCODE
+       Write-Host "Exit code: $exitCode"
+       exit $exitCode
         
     - name: Upload DRMTest output
       uses: actions/upload-artifact@v4
