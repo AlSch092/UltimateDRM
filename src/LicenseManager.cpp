@@ -1,5 +1,17 @@
 #include "../include/LicenseManager.hpp"
 
+
+/**
+ * @brief Loads the public key contents from a PEM formatted string
+ *
+ * This function extracts the base64 encoded public key from a PEM formatted string.
+ *
+ * @param pubKeyText The PEM formatted public key text
+ *
+ * @return A vector of bytes containing the decoded public key
+ *
+ * @details The PEM format should contain "-----BEGIN PUBLIC KEY-----" and "-----END PUBLIC KEY-----" markers.
+ */ 
 std::vector<uint8_t> LicenseManager::LoadPublicKeyContents(const std::string& pubKeyText)
 {
 	if (pubKeyText.empty())
@@ -33,6 +45,17 @@ std::vector<uint8_t> LicenseManager::LoadPublicKeyContents(const std::string& pu
 	return b64DecodedPubKey;
 }
 
+/**
+ * @brief Loads the RSA public key from DER encoded data
+ *
+ * This function imports the RSA public key from DER encoded data.
+ *
+ * @param derData The DER encoded public key data
+ *
+ * @return A handle to the imported RSA public key
+ *
+ * @details The DER data should be in the format of X.509 SubjectPublicKeyInfo.
+ */
 BCRYPT_KEY_HANDLE LicenseManager::LoadRSAPublicKey(const std::vector<uint8_t> derData)
 {
     CERT_PUBLIC_KEY_INFO* pubKeyInfo = nullptr;
@@ -56,6 +79,19 @@ BCRYPT_KEY_HANDLE LicenseManager::LoadRSAPublicKey(const std::vector<uint8_t> de
     return hKey;
 }
 
+/**
+ * @brief Verifies the signature of the license data using the public key
+ *
+ * This function verifies the signature of the license data using the provided public key.
+ *
+ * @param hKey Handle to the RSA public key
+ * @param licenseData The license data to verify
+ * @param signature The signature to verify against the license data
+ *
+ * @return True if the signature is valid, false otherwise
+ *
+ * @details The licenseData should be the same as what was signed with the private key.
+ */
 bool LicenseManager::VerifySignature(BCRYPT_KEY_HANDLE hKey, const std::vector<uint8_t>& licenseData, const std::vector<uint8_t>& signature)
 {
 	if (!hKey || licenseData.empty() || signature.empty())
@@ -73,6 +109,20 @@ bool LicenseManager::VerifySignature(BCRYPT_KEY_HANDLE hKey, const std::vector<u
 	return (status == 0);
 }
 
+/**
+ * @brief Verifies the license using the public key
+ *
+ * This function verifies the license by loading the public key and checking the signature.
+ *
+ * @return True if the license is valid, false otherwise
+ *
+ * @details The license key should be loaded previously from a local file on disc
+ *
+ *  @example
+ *
+ * @usage
+ * bool verified = LicenseManager->VerifyLicense();
+ */
 bool LicenseManager::VerifyLicense()
 {
 	if (this->LicenseFileName.empty())
@@ -111,4 +161,59 @@ bool LicenseManager::VerifyLicense()
 	{
 		throw std::runtime_error("Failed to load RSA public key: " + std::string(e.what()));
 	}
+}
+
+/**
+ * @brief Checks license key online via HTTP(S)
+ *
+ * This function checks the local license against the license server
+ * using a POST HTTP request. 
+ *
+ * @param bUsingEncryption If true, the HTTP post body will be encrypted
+ *
+ * @return True if the license is valid, false otherwise
+ *
+ * @details The license key should be loaded previously from a local file on disc
+ *
+ *  @example
+ *
+ * @usage
+ * bool verified = LicenseManager->VerifyLicenseOnline(true); 
+ */
+bool LicenseManager::VerifyLicenseOnline(bool bUsingEncryption)
+{
+	if (this->LicenseServerEndpoint.empty() || this->LicenseKey.empty())
+	{
+		//throw std::runtime_error("License information cannot be empty @ VerifyLicenseOnline");
+		return false;
+	}
+
+	std::vector<std::string> headers = 
+	{
+		"Content-Type: application/json",
+		"Accept: application/json"
+	};
+
+	std::vector<std::string> responseHeaders;
+
+	std::string postBody = "({\"action\": \"verify_license\", \"license_key\": " + this->LicenseKey + "})"; //can be encrypted further to reduce HTTP interception/sniffing
+	
+	if (bUsingEncryption) //encrypt HTTP post body
+	{
+		//todo: implement this, haven't decided on encryption method yet
+	}
+
+	std::string responseText = HttpClient::PostRequest(this->LicenseServerEndpoint, headers, "", postBody, responseHeaders);
+
+	if (responseText.empty() || std::find(responseHeaders.begin(), responseHeaders.end(), "HTTP/1.1 200 OK") == responseHeaders.end())
+	{
+		return false;
+	}
+
+	if (bUsingEncryption) //decrypt http response body
+	{
+		//todo: implement this, haven't decided on encryption method yet
+	}
+
+	return (responseText.find("\"status\": \"valid\"") != std::string::npos) ? true : false;
 }

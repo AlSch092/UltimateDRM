@@ -28,11 +28,13 @@ public:
 	}
 
 	bool VerifyLicense();
+	bool VerifyLicenseOnline(bool bUsingEncryption);
 
 private:
 	
 	char* RSAPubKeyPinned = nullptr;
 
+	std::string LicenseKey;
 	std::vector<uint8_t> LicenseSignature; //grabbed from file or registry or w/e
 	std::string LicenseFileName;
 

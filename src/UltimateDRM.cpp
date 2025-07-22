@@ -11,6 +11,21 @@
 #include "../include/Integrity.hpp"
 
 #pragma comment(linker, "/ALIGN:0x10000") //for section remapping
+#pragma comment (linker, "/INCLUDE:_tls_used")
+#pragma comment (linker, "/INCLUDE:_tls_callback")
+
+void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved);
+LONG WINAPI g_VectoredExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo);
+
+EXTERN_C
+#ifdef _M_X64
+#pragma const_seg (".CRT$XLB") //store tls callback inside the correct section
+const
+#endif
+
+PIMAGE_TLS_CALLBACK _tls_callback = TLSCallback;
+#pragma data_seg ()
+#pragma const_seg ()
 
 Settings* Settings::Instance = nullptr; //singleton static instance decl to avoid compilation errors
 
@@ -124,10 +139,12 @@ bool DRM::Protect()
 		}
 	}
 
-	if (!Settings::Instance->allowedParents.empty())
+	if (!Settings::Instance->allowedParents.empty()) //check parent process
 	{
 		bool verifiedParent = false;
 		DWORD parentPid = Process::GetParentProcessId();
+
+		printf("parentPid: %d\n", parentPid);
 
 		for (std::wstring parent : Settings::Instance->allowedParents) 	//check parent process name, then check code signing cert
 		{
@@ -152,6 +169,7 @@ bool DRM::Protect()
 			}
 			else
 			{
+				printf("verifiedParent = true\n");
 				verifiedParent = true;
 				break; //if we don't require code signing, just check the process name
 			}
@@ -175,7 +193,7 @@ bool DRM::Protect()
 			throw std::runtime_error("Failed to calculate module checksum");
 		}
 
-		this->pImpl->IntegrityChecker->StoreModuleChecksum(GetModuleHandle(NULL), moduleChecksum); //tested and working
+		this->pImpl->IntegrityChecker->StoreModuleChecksum(GetModuleHandle(NULL), moduleChecksum); //tested and working fine
 
 
 	}
@@ -202,4 +220,98 @@ bool DRM::Protect()
 	}
 
 	return true;
+}
+
+
+/**
+ * @brief TLS callback
+ *
+ * This function is executed on thread attach/detach and process attach/detach
+ *
+ * @param pHandle  Handle to the module instance
+ * @param dwReason  Type of event which triggered the callback
+ * @param Reserved  Unused
+ * 
+ * @return None
+ * 
+ * @details On Windows 10, the callback can be used to block execution of foreign or unknown threads by 
+ *  checking the stack for the thread's execution address and calling ExitThread(GetCurrentThreadId())
+ *  if execution address is not within the valid range of any known & verified loaded module.
+ *
+ * @usage
+ *  N/A
+ */
+void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
+{
+	const UINT ThreadExecutionAddressStackOffset = 0x378; //** Windows10 only, this offset on the stack does not have a return address on Windows 11
+
+	static bool bFirstProcessAttach = true;
+	static WindowsVersion WinVersion = WindowsVersion::ErrorUnknown;
+
+	switch (dwReason)
+	{
+	case DLL_PROCESS_ATTACH:
+	{
+		if (bFirstProcessAttach)
+		{
+			bFirstProcessAttach = false;
+
+			WinVersion = Services::GetWindowsVersion();
+
+			//if (!Preventions::StopMultipleProcessInstances()) //prevent multi-clients by using shared memory-mapped region
+			//{
+			//	Logger::logf(Err, "Could not initialize program: shared memory check failed, make sure only one instance of the program is open. Shutting down.");
+			//	terminate();
+			//}
+
+			SetUnhandledExceptionFilter(g_VectoredExceptionHandler);
+
+			if (!AddVectoredExceptionHandler(1, g_VectoredExceptionHandler))
+			{
+#ifdef LOGGING_ENABLED
+				Logger::logf(Err, " Failed to register Vectored Exception Handler @ TLSCallback: %d\n", GetLastError());
+#endif
+				throw std::runtime_error("Failed to register Vectored Exception Handler");
+			}
+		}
+	}break;
+
+	case DLL_PROCESS_DETACH: //program exit, clean up any memory allocated if required
+	{
+	}break;
+
+	case DLL_THREAD_ATTACH: //add to our thread list, or if thread is not executing valid address range, patch over execution address
+	{
+	}break;
+
+	case DLL_THREAD_DETACH:
+	{
+	}break;
+	};
+}
+
+/**
+ * @brief Vectored Exception Handler
+ *
+ * This function catches program-wide unhandled exceptions
+ *
+ * @param ExceptionInfo  Registers, excpetion code, exception address, etc
+ *
+ * @return EXCEPTION_CONTINUE_SEARCH - do not handle the exception, just log info and keep searching
+ *
+ * @details Certain unhandled exceptions might be indicative of tampering
+ *
+ *  @example
+ *
+ * @usage
+ *  AddVectoredExceptionHandler(1, g_VectoredExceptionHandler)
+ */
+LONG WINAPI g_VectoredExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo)
+{
+	DWORD exceptionCode = ExceptionInfo->ExceptionRecord->ExceptionCode;
+
+#ifdef LOGGING_ENABLED
+	Logger::logf(Err, "Vectored Exception Handler called with exception code : 0x % 08X\n", exceptionCode);
+#endif
+	return EXCEPTION_CONTINUE_SEARCH;
 }

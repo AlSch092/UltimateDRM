@@ -52,6 +52,9 @@
     <ClCompile Include="src\Thread.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\HttpClient.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Settings.hpp">

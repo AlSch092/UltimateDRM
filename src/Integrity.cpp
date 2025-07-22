@@ -127,8 +127,9 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 	while (checking)
 	{
 		uint64_t checksum_main = Integrity::CalculateChecksum(GetModuleHandle(NULL));
+		uint64_t prev_checksum = integrity->RetrieveModuleChecksum(GetModuleHandle(NULL));
 
-		if (checksum_main != integrity->ModuleChecksums[GetModuleHandle(NULL)])
+		if (checksum_main != prev_checksum && prev_checksum != 0)
 		{
 			//optionally, log to a remote server
 			throw std::runtime_error("Integrity check failed: main module checksum mismatch");

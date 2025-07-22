@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\HttpClient.cpp" />
     <ClCompile Include="src\Integrity.cpp" />
     <ClCompile Include="src\LicenseManager.cpp" />
     <ClCompile Include="src\Logger.cpp" />
