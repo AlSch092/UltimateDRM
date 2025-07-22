@@ -201,8 +201,6 @@ bool DRM::Protect()
 		}
 
 		this->pImpl->IntegrityChecker->StoreModuleChecksum(GetModuleHandle(NULL), moduleChecksum); //tested and working fine
-
-
 	}
 
 	if (Settings::Instance->bRequireCodeSigning)
@@ -213,8 +211,6 @@ bool DRM::Protect()
 
 		if (!currentProcName.empty() && !processDirectory.empty())
 		{
-			std::wcout << L"Checking code signature of: " << fullProcessPath << std::endl;
-
 			if (!Authenticode::HasSignature(fullProcessPath.c_str(), TRUE)) //check if the current process has a valid signature
 			{
 				return false;

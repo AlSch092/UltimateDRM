@@ -194,8 +194,6 @@ bool LicenseManager::VerifyLicenseOnline(bool bUsingEncryption)
 		"Accept: application/json"
 	};
 
-	std::vector<std::string> responseHeaders;
-
 	std::string postBody = "({\"action\": \"verify_license\", \"license_key\": " + this->LicenseKey + "})"; //can be encrypted further to reduce HTTP interception/sniffing
 	
 	if (bUsingEncryption) //encrypt HTTP post body
@@ -203,9 +201,17 @@ bool LicenseManager::VerifyLicenseOnline(bool bUsingEncryption)
 		//todo: implement this, haven't decided on encryption method yet
 	}
 
-	std::string responseText = HttpClient::PostRequest(this->LicenseServerEndpoint, headers, "", postBody, responseHeaders);
+	HttpRequest requestInfo;
+	requestInfo.url = this->LicenseServerEndpoint;
+	requestInfo.requestHeaders = headers;
+	requestInfo.body = postBody;
 
-	if (responseText.empty() || std::find(responseHeaders.begin(), responseHeaders.end(), "HTTP/1.1 200 OK") == responseHeaders.end())
+	if (!HttpClient::PostRequest(requestInfo))
+	{
+		return false; //failed to send request
+	}
+
+	if (requestInfo.responseText.empty() || std::find(requestInfo.responseHeaders.begin(), requestInfo.responseHeaders.end(), "HTTP/1.1 200 OK") == requestInfo.responseHeaders.end())
 	{
 		return false;
 	}
@@ -215,5 +221,5 @@ bool LicenseManager::VerifyLicenseOnline(bool bUsingEncryption)
 		//todo: implement this, haven't decided on encryption method yet
 	}
 
-	return (responseText.find("\"status\": \"valid\"") != std::string::npos) ? true : false;
+	return (requestInfo.responseText.find("\"status\": \"valid\"") != std::string::npos) ? true : false;
 }
