@@ -12,17 +12,24 @@ This project aims to take the good portions of the UltimateAnticheat project whi
 ** This project was started on July 19, 2025, and might not have many files yet  
 ** There is no such thing as an 'uncrackable DRM' - any code or binaries run on a client machine can be tampered with enough effort  
 
-## Features:  
-- Memory protections  
+## Current Features:  
+- Settings class which controls which types of DRM checks to occur  
+- Memory protections/anti-tamper     
 - Licensing  (not yet finished)  
 - Integrity checks (periodic checksums, loaded module checks)  
 - Blocks multiple client instances  
+- Checks for and blocks threads spawning on addresses outside of any loaded module (<Windows 10 only)  
+- Checks the parent process against a whitelist  
+- Optionally enforces code signing via Authenticode APIs  
+- Anti-debugging checks and thread hiding from debuggers  
 
 ## How to use:  
 The project is a static library (.lib) which you can include in your C++ project, along with the `DRM.hpp` header file. You can then create a `DRM` class object and call the `Protect` function. Please see `DRMTest/DRMTest.cpp` for an example of how to implement this into your own project.  
 
 ## Testing
-The `DRMTest` folder contains a project which links to `UltimateDRM.lib` and tests different features of it. A failed test returns -1 from its `main` function, while a successful test returns 0.  
+The `DRMTest` folder contains a project which links to `UltimateDRM.lib` and tests different features of it. A failed test returns non-zero from its `main` function, while a successful test returns 0.  
+
+GitHub Actions is being used to conduct automated tests, and will trigger each time a code push is done. So far this is just a simple build + run workflow.  
 
 ## Licensing
 Anyone is free to use this project. If you end up using it in a project that is for commercial purposes and makes money, credits would be appreciated at the least.  
