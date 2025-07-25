@@ -1,5 +1,5 @@
 #include "../include/remap.hpp"
-#include "../include/ntdll.hpp"
+#include "../include/Definitions.hpp"
 #include "../include/Logger.hpp"
 
 //=============================================================================

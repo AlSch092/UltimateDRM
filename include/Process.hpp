@@ -1,6 +1,6 @@
 //Process.hpp by Alsch092 @ Github
 #pragma once
-#include "PEB.hpp"
+#include "Definitions.hpp"
 #include "NAuthenticode.hpp"
 #include "Services.hpp"
 #include <Psapi.h>

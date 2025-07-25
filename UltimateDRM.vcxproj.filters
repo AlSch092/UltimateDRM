@@ -20,6 +20,12 @@
     <Filter Include="include\json">
       <UniqueIdentifier>{f467d9d0-9400-46b7-9677-1360352c1e3a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\AntiDebug">
+      <UniqueIdentifier>{09ce1070-b2fc-4292-97b2-461948341a3d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\AntiDebug">
+      <UniqueIdentifier>{0bf9cc56-2647-423c-a8e4-1b4c023b1acb}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\UltimateDRM.cpp">
@@ -54,6 +60,12 @@
     </ClCompile>
     <ClCompile Include="src\HttpClient.cpp">
       <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\AntiDebug\AntiDebugger.cpp">
+      <Filter>src\AntiDebug</Filter>
+    </ClCompile>
+    <ClCompile Include="src\AntiDebug\DebuggerDetections.cpp">
+      <Filter>src\AntiDebug</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -140,6 +152,15 @@
     </ClInclude>
     <ClInclude Include="include\Thread.hpp">
       <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Definitions.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AntiDebugger.hpp">
+      <Filter>include\AntiDebug</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DebuggerDetections.hpp">
+      <Filter>include\AntiDebug</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

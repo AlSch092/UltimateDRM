@@ -9,6 +9,8 @@
 #include "../include/Logger.hpp"
 #include "../include/LicenseManager.hpp"
 #include "../include/Integrity.hpp"
+#include "../include/Definitions.hpp"
+#include "../include/AntiDebug/DebuggerDetections.hpp"
 
 #pragma comment(linker, "/ALIGN:0x10000") //for section remapping
 #pragma comment (linker, "/INCLUDE:_tls_used")
@@ -187,10 +189,10 @@ bool DRM::Protect()
 	if (Settings::Instance->bCheckIntegrity)
 	{
 #ifndef _DEBUG
-		if (!RmpRemapImage((ULONG_PTR)GetModuleHandle(NULL)))
-		{
-			throw std::runtime_error("Failed to remap program sections");
-		}
+		//if (!RmpRemapImage((ULONG_PTR)GetModuleHandle(NULL))) //possibly  causes Defender false positive? Debug compilation does not throw false positive, where this is excluded
+		//{
+		//	throw std::runtime_error("Failed to remap program sections");
+		//}
 #endif
 
 		uint64_t moduleChecksum = Integrity::CalculateChecksum(GetModuleHandle(NULL));
@@ -294,8 +296,7 @@ bool DRM::Impl::StopMultipleProcessInstances()
  */
 void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 {
-	const UINT ThreadExecutionAddressStackOffset = 0x378; //** Windows10 only, this offset on the stack does not have a return address on Windows 11
-
+	static uint32_t ThreadExecutionAddressStackOffset = 0; //** Windows10 only, this offset on the stack does not have a return address on Windows 11
 	static bool bFirstProcessAttach = true;
 	static WindowsVersion WinVersion = WindowsVersion::ErrorUnknown;
 
@@ -308,6 +309,9 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 			bFirstProcessAttach = false;
 
 			WinVersion = Services::GetWindowsVersion();
+
+			if (WinVersion == Windows10)
+				ThreadExecutionAddressStackOffset = 0x378;
 
 			SetUnhandledExceptionFilter(g_VectoredExceptionHandler);
 
@@ -327,6 +331,47 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 
 	case DLL_THREAD_ATTACH: //add to our thread list, or if thread is not executing valid address range, patch over execution address
 	{
+#ifndef _DEBUG
+		if (!Debugger::AntiDebug::HideThreadFromDebugger(GetCurrentThread())) //hide thread from debuggers, placing this in the TLS callback allows all threads to be hidden
+		{
+#ifdef LOGGING_ENABLED
+			Logger::logf(Warning, " Failed to hide thread from debugger @ TLSCallback: thread id %d\n", GetCurrentThreadId());
+#endif
+		}
+#endif
+
+		if (WinVersion == WindowsVersion::Windows11) //thread start address is not on the stack in windows 11
+			return;
+
+		uint64_t ThreadStartAddress = *(uint64_t*)((uint64_t)_AddressOfReturnAddress() + ThreadExecutionAddressStackOffset);
+
+		if (!ThreadStartAddress)
+			return;
+
+		auto moduleList = Process::GetLoadedModules();
+
+		for (auto module : moduleList)
+		{
+			if (ThreadStartAddress > ((uint64_t)module.dllInfo.lpBaseOfDll) && ThreadStartAddress < ((uint64_t)module.dllInfo.lpBaseOfDll + module.dllInfo.SizeOfImage))
+			{
+				return; // thread is executing within a valid module range, no need to suppress/exit it
+			}
+		}
+
+		DWORD dwOldProt = 0;
+
+		if (!VirtualProtect((LPVOID)ThreadStartAddress, sizeof(uint8_t), PAGE_EXECUTE_READWRITE, &dwOldProt)) //make thread start address writable
+		{
+#ifdef LOGGING_ENABLED
+			Logger::logf(Warning, "Failed to call VirtualProtect on ThreadStart address @ TLSCallback: %llX", ThreadStartAddress);
+#endif
+		}
+		else
+		{
+		    *(uint8_t*)ThreadStartAddress = 0xC3; //patch over any functions which are scheduled to execute next by this thread and not inside our whitelisted address range	
+			ExitThread(0);
+		}
+		
 	}break;
 
 	case DLL_THREAD_DETACH:

@@ -1,7 +1,7 @@
 //By AlSch092 @github, ProtectedMemory class originally from my project found at https://github.com/AlSch092/RemapProtectedClass
 
 #pragma once
-#include "ntdll.hpp"
+#include "Definitions.hpp"
 #include <stdexcept>
 
 using namespace std;

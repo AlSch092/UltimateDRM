@@ -19,6 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\AntiDebug\AntiDebugger.cpp" />
+    <ClCompile Include="src\AntiDebug\DebuggerDetections.cpp" />
     <ClCompile Include="src\HttpClient.cpp" />
     <ClCompile Include="src\Integrity.cpp" />
     <ClCompile Include="src\LicenseManager.cpp" />
@@ -32,6 +34,7 @@
     <ClCompile Include="src\Utility.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\AntiDebugger.hpp" />
     <ClInclude Include="include\curl\curl.h" />
     <ClInclude Include="include\curl\curlver.h" />
     <ClInclude Include="include\curl\easy.h" />
@@ -44,6 +47,8 @@
     <ClInclude Include="include\curl\typecheck-gcc.h" />
     <ClInclude Include="include\curl\urlapi.h" />
     <ClInclude Include="include\curl\websockets.h" />
+    <ClInclude Include="include\DebuggerDetections.hpp" />
+    <ClInclude Include="include\Definitions.hpp" />
     <ClInclude Include="include\DRM.hpp" />
     <ClInclude Include="include\HttpClient.hpp" />
     <ClInclude Include="include\Integrity.hpp" />

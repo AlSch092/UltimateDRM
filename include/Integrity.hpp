@@ -23,6 +23,16 @@ public:
 		{
 			throw std::runtime_error("Failed to create PeriodicIntegrityCheckThread: " + std::string(ex.what()));
 		}
+
+		this->ModuleList = Process::GetLoadedModules(); //get the list of loaded modules at the time of instantiation
+
+		if (this->ModuleList.empty())
+		{
+#ifdef LOGGING_ENABLED
+			Logger::logf(Err, "Failed to retrieve loaded modules during Integrity class instantiation");
+#endif
+			throw std::runtime_error("Failed to retrieve loaded modules during Integrity class instantiation");
+		}
 	}
 
 	~Integrity()
@@ -43,6 +53,7 @@ public:
 
 private:
 
+	std::vector<ProcessData::MODULE_DATA> ModuleList;
 	unordered_map<HMODULE, uint64_t> ModuleChecksums; //stores module checksums for quick access
 
 	std::unique_ptr<Thread> PeriodicIntegrityCheckThread = nullptr; //thread for periodic integrity checks
