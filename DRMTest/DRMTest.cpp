@@ -39,7 +39,7 @@ int main()
 	const std::string LicenseServerEndpoint = "https://example.com/api/license"; //replace with your actual license server endpoint
 	const bool bAllowOfflineUsage = true;
 	const bool bUsingLicensing = false;
-	const bool bEnforceHypervisorCheck = true;
+	const bool bEnforceHypervisorCheck = false; //having this set to true will cause Github Actions tests to fail, since they run on a VM
 	const bool bRequireCodeSigning = false; //in production code, this should be set to true
 
 	DRM* drm = new DRM(LicenseServerEndpoint, bAllowOfflineUsage, bUsingLicensing, bEnforceHypervisorCheck, bRequireCodeSigning, lAllowedParents);
