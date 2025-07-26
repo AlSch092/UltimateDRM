@@ -74,6 +74,8 @@ int main()
 
 	DWORD dwOldProt = 0;
 
+	printf("textSectionStart at: %llX\n", textSectionStart);
+
 	if (VirtualProtect((LPVOID)textSectionStart, 0x1000, PAGE_EXECUTE_READWRITE, &dwOldProt))
 	{
 		std::cout << "Text section is writable: test failed\n";
