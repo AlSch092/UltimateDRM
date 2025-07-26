@@ -528,7 +528,7 @@ bool Services::IsHypervisorPresent()
     Services::GetCPUVendor - fetches the CPU vendor
 Additionally, 0x40000001 to 0x400000FF can be queries in the 2nd parameter to __cpuid for more hypervisor-specific info
 */
-string Services::GetCPUVendor() 
+const string Services::GetCPUVendor() 
 {
     int cpuInfo[4] = { 0 };
 
@@ -553,7 +553,7 @@ string Services::GetCPUVendor()
 "prl hyperv"	Parallels
 "VBoxVBoxVBox"	VirtualBox
 */
-string Services::GetHypervisorVendor()
+const string Services::GetHypervisorVendor()
 {
     int cpuInfo[4] = { 0 };
 

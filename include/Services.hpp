@@ -104,8 +104,8 @@ public:
 	static WindowsVersion GetWindowsVersion();
 	
 	static bool IsHypervisorPresent();
-	static string GetHypervisorVendor();
-	static string GetCPUVendor();
+	static const string GetHypervisorVendor();
+	static const string GetCPUVendor();
 	
 	static string GetProcessDirectory(__in const DWORD pid); //fetch the directory of `pid`
 	static wstring GetProcessDirectoryW(__in const DWORD pid); //fetch the directory of `pid`

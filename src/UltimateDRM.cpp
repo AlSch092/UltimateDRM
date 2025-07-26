@@ -11,6 +11,7 @@
 #include "../include/Integrity.hpp"
 #include "../include/Definitions.hpp"
 #include "../include/AntiDebug/DebuggerDetections.hpp"
+#include "../include/DRMException.hpp"
 
 #pragma comment(linker, "/ALIGN:0x10000") //for section remapping
 #pragma comment (linker, "/INCLUDE:_tls_used")
@@ -45,6 +46,8 @@ struct DRM::Impl
 	std::unique_ptr<Integrity> IntegrityChecker = nullptr; //integrity checker for the current process
 
 	std::unique_ptr<LicenseManager> LicenseManagerPtr = nullptr; //license manager for the current process
+
+	std::unique_ptr<DebuggerDetections> AntiDebugger = nullptr; //debugger detections for the current process
 
 	Impl(const std::string& LicenseServerEndpoint,
 		const bool bAllowOfflineUsage, 
@@ -93,9 +96,22 @@ struct DRM::Impl
 
 			this->IntegrityChecker = std::make_unique<Integrity>();
 		}
-		catch (const std::runtime_error& ex)
+		catch (const std::bad_alloc&  ex)
 		{
 			throw std::runtime_error("Could not initialize smart ptrs: " + std::string(ex.what()));
+		}
+
+		try
+		{
+			if (Settings::Instance->bUseAntiDebugging)
+			{
+				this->AntiDebugger = std::make_unique<DebuggerDetections>(Settings::Instance);
+				this->AntiDebugger->StartAntiDebugThread();
+			}
+		}
+		catch (const std::bad_alloc& ex)
+		{
+			throw std::runtime_error("Could not initialize AntiDebugger: " + std::string(ex.what()));
 		}
 	}
 
@@ -147,7 +163,7 @@ bool DRM::Protect()
 
 		if (!this->pImpl->LicenseManagerPtr->VerifyLicense())
 		{
-			throw std::runtime_error("License verification failed");
+			throw DRMException(DRMException::LicenseVerificationFailed);
 		}
 	}
 
@@ -169,7 +185,7 @@ bool DRM::Protect()
 			{
 				if (!Authenticode::HasSignature(std::wstring(parentProcDirectory + parentProcName).c_str(), TRUE))
 				{
-					throw std::runtime_error("Parent process was not code signed, possible imposter");
+					throw DRMException(DRMException::CodeSigningFailed);
 				}
 				else
 				{
@@ -194,7 +210,6 @@ bool DRM::Protect()
 			throw std::runtime_error("Failed to remap program sections");
 		}
 #endif
-
 		uint64_t moduleChecksum = Integrity::CalculateChecksum(GetModuleHandle(NULL));
 
 		if (moduleChecksum == 0)
@@ -215,12 +230,39 @@ bool DRM::Protect()
 		{
 			if (!Authenticode::HasSignature(fullProcessPath.c_str(), TRUE)) //check if the current process has a valid signature
 			{
+#ifdef LOGGING_ENABLED
+				Logger::logf(Err, "Could not initialize program: Parent process lacked proper code signature");
+#endif
 				return false;
 			}
 		}
 		else
 		{
 			throw std::runtime_error("Failed to get current process name");
+		}
+	}
+
+	if (Settings::Instance->bCheckHypervisor)
+	{
+		if (Services::IsHypervisorPresent())
+		{
+			const std::string hypervisorVendor = Services::GetHypervisorVendor();
+
+			if (!hypervisorVendor.empty())
+			{
+				if (hypervisorVendor == "Microsoft Hv" ||
+					hypervisorVendor == "KVMKVMKVM" ||
+					hypervisorVendor == "VMwareVMware" ||
+					hypervisorVendor == "XenVMMXenVMM" ||
+					hypervisorVendor == "prl hyperv" ||
+					hypervisorVendor == "VBoxVBoxVBox")
+				{
+#ifdef LOGGING_ENABLED
+						Logger::logf(Err, "Hypervisor detected: %s. Shutting down.", hypervisorVendor.c_str());
+#endif
+						throw DRMException(DRMException::HypervisorDetected);
+				}
+			}
 		}
 	}
 

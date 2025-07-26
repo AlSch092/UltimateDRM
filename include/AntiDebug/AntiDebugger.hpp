@@ -6,6 +6,7 @@
 #include "../Thread.hpp"
 #include "../Definitions.hpp"
 #include "../Process.hpp"
+#include "../XorStr.hpp"
 #include <vector>
 #include <functional>
 
@@ -47,13 +48,6 @@ namespace Debugger
             {
 #ifdef LOGGING_ENABLED
                 Logger::logf(Warning, "Settings object pointer was somehow nullptr, unknown behavior may take place @ AntiDebug::AntiDebug()");
-#endif
-            }
-
-            if (!PreventWindowsDebuggers()) //patch over some routine preambles, this may be phased out in future
-            {
-#ifdef LOGGING_ENABLED
-                Logger::logf(Warning, "Routine PreventWindowsDebuggers failed @ AntiDebug::AntiDebug()");
 #endif
             }
 

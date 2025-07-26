@@ -50,6 +50,7 @@
     <ClInclude Include="include\DebuggerDetections.hpp" />
     <ClInclude Include="include\Definitions.hpp" />
     <ClInclude Include="include\DRM.hpp" />
+    <ClInclude Include="include\DRMException.hpp" />
     <ClInclude Include="include\HttpClient.hpp" />
     <ClInclude Include="include\Integrity.hpp" />
     <ClInclude Include="include\json\json.hpp" />

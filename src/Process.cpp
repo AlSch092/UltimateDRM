@@ -29,7 +29,9 @@ BOOL Process::CheckParentProcess(__in const wstring desiredParent, __in const bo
         }
 
 		if (!bFoundValidSignature)
+#ifdef LOGGING_ENABLED
 			Logger::logf(Err, "Parent process %s does not have a valid signature", desiredParent.c_str());
+#endif
 
 		return bFoundValidSignature;
     }
@@ -70,12 +72,16 @@ bool Process::HasExportedFunction(__in const string dllName, __in const  string 
             }
         }
         else
+#ifdef LOGGING_ENABLED
             Logger::log(Err, " ImageExportDirectory was NULL @ Process::HasExportedFunction");
+#endif
         
         UnMapAndLoad(&LoadedImage);
     }
     else
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "MapAndLoad failed: %d @ Process::HasExportedFunction \n", GetLastError());
+#endif
     
 
     return bFound;
@@ -100,7 +106,9 @@ list<ProcessData::Section*> Process::GetSections(__in const string module)
 
     if (pDoH == NULL || hInst == NULL)
     {
-        Logger::logf(Err, " PIMAGE_DOS_HEADER or hInst was NULL at Process::GetSections\n");
+#ifdef LOGGING_ENABLED
+        Logger::logf(Err, " PIMAGE_DOS_HEADER or hInst was NULL at Process::GetSections");
+#endif
         return Sections;
     }
 
@@ -134,341 +142,6 @@ list<ProcessData::Section*> Process::GetSections(__in const string module)
     }
 
     return Sections;
-}
-
-/*
-    ChangeModuleName - Modifies the module name of a loaded module at runtime, which might trip up attackers and make certain parts of their code fail. Please see my project "ChangeModuleName" for more details
-    requirements: ensure the new module name is the same or less length of the one you are changing or else you need to shift memory properly where all module names are being stored, and requires additions to this code.
-    Originally taken from my other project at: https://github.com/AlSch092/changemodulename
-    returns `true` on successfully renaming `szModule` to `newName`.
-*/
-bool Process::ChangeModuleName(__in const wstring moduleName, __in const  wstring newName)
-{
-#ifdef _M_IX86
-    MYPEB* PEB = (MYPEB*)__readfsdword(0x30);
-#else
-    MYPEB* PEB = (MYPEB*)__readgsqword(0x60);
-#endif
-
-    _LIST_ENTRY* f = PEB->Ldr->InMemoryOrderModuleList.Flink;
-
-    bool Found = FALSE;
-    int count = 0;
-
-    while (!Found && count < 1024) //traverse module list , stops at 1024 loops to prevent any possible infinite looping
-    {
-        MY_PLDR_DATA_TABLE_ENTRY dataEntry = CONTAINING_RECORD(f, MY_LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
-
-        if (wcsstr(dataEntry->FullDllName.Buffer, moduleName.c_str()))
-        {
-            wcscpy_s(dataEntry->FullDllName.Buffer, moduleName.size() + 1, newName.c_str()); //..then modify the string modulename to newName
-            dataEntry->FullDllName.Length = (newName.length() * 2) + 1;
-            dataEntry->FullDllName.MaximumLength = (newName.length() * 2) + 1;
-            Found = TRUE;
-            return true;
-        }
-
-        f = dataEntry->InMemoryOrderLinks.Flink;
-        count++;
-    }
-
-    return false;
-}
-
-/*
-    ChangeModuleBase - Changes the DllBase member in the PLDR_DATA_TABLE_ENTRY structure at Ldr->InMemoryOrderLinks. Not confirmed yet if this can trip up attackers, need to do a bit more testing
-    returns true on success
-*/
-bool Process::ChangeModuleBase(__in const wchar_t* szModule, __in const  uint64_t moduleBaseAddress)
-{
-#ifdef _M_IX86
-    MYPEB* PEB = (MYPEB*)__readfsdword(0x30);
-#else
-    MYPEB* PEB = (MYPEB*)__readgsqword(0x60);
-#endif
-
-    _LIST_ENTRY* f = PEB->Ldr->InMemoryOrderModuleList.Flink;
-    bool Found = FALSE;
-    int count = 0;
-
-    while (!Found && count < 256)
-    {
-        MY_PLDR_DATA_TABLE_ENTRY dataEntry = CONTAINING_RECORD(f, MY_LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
-
-        if (wcsstr(dataEntry->FullDllName.Buffer, szModule))
-        {
-            dataEntry->DllBase = (PVOID)moduleBaseAddress;
-            Found = TRUE;
-            return true;
-        }
-
-        f = dataEntry->InMemoryOrderLinks.Flink;
-        count++;
-    }
-
-    return false;
-}
-
-/*
-    ChangeModulesChecksum - Changes the `CheckSum` member in the PLDR_DATA_TABLE_ENTRY structure at Ldr->InMemoryOrderLinks
-    returns `true` on success
-*/
-bool Process::ChangeModulesChecksum(__in const  wchar_t* szModule, __in const  DWORD checksum)
-{
-#ifdef _M_IX86
-    MYPEB* PEB = (MYPEB*)__readfsdword(0x30);
-#else
-    MYPEB* PEB = (MYPEB*)__readgsqword(0x60);
-#endif
-
-    _LIST_ENTRY* f = PEB->Ldr->InMemoryOrderModuleList.Flink;
-    bool Found = FALSE;
-    int count = 0;
-
-    while (!Found && count < 256)
-    {
-        MY_PLDR_DATA_TABLE_ENTRY dataEntry = CONTAINING_RECORD(f, MY_LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
-
-        if (wcsstr(dataEntry->FullDllName.Buffer, szModule))
-        {
-            dataEntry->CheckSum = checksum;
-            Found = TRUE;
-            return true;
-        }
-
-        f = dataEntry->InMemoryOrderLinks.Flink;
-        count++;
-    }
-
-    return false;
-}
-
-
-/*
-ChangePEEntryPoint - modifies the `OptionalHeader.AddressOfEntryPoint` in the NT headers to throw off runtime querying by attackers
-returns true on success
-*/
-bool Process::ChangePEEntryPoint(__in const DWORD newEntry)
-{
-    PIMAGE_DOS_HEADER pDoH;
-    PIMAGE_NT_HEADERS pNtH;
-    DWORD protect = 0;
-    HINSTANCE hInst = GetModuleHandleW(NULL);
-
-    if (!hInst) 
-        return false;
-
-    pDoH = (PIMAGE_DOS_HEADER)(hInst);
-    pNtH = (PIMAGE_NT_HEADERS)((PIMAGE_NT_HEADERS)((PBYTE)hInst + (DWORD)pDoH->e_lfanew));
-
-    if (pNtH) 
-    {
-        UINT64 pEntry = (UINT64)&pNtH->OptionalHeader.AddressOfEntryPoint;
-
-        if (pEntry)
-        {
-            VirtualProtect((LPVOID)pEntry, sizeof(DWORD), PAGE_READWRITE, &protect);
-
-            __try
-            {
-                memcpy((void*)&pEntry, (void*)&newEntry, sizeof(DWORD));
-                VirtualProtect((LPVOID)pEntry, sizeof(DWORD), protect, &protect);
-                return true;
-            }
-            __except (EXCEPTION_EXECUTE_HANDLER)
-            {
-                VirtualProtect((LPVOID)pEntry, sizeof(DWORD), protect, &protect);
-                return false;
-            }
-        }
-    }
-    
-    return false;
-}
-
-/*
-ChangeImageSize - modifies the `OptionalHeader.SizeOfImage` in the NT headers to throw off runtime querying by attackers
-returns true on success
-*/
-bool Process::ChangeImageSize(__in const DWORD newEntry)
-{
-    PIMAGE_DOS_HEADER pDoH;
-    PIMAGE_NT_HEADERS pNtH;
-    DWORD protect;
-    HINSTANCE hInst = GetModuleHandleW(NULL);
-
-    if (!hInst) 
-        return false;
-
-    pDoH = (PIMAGE_DOS_HEADER)(hInst);
-
-    pNtH = (PIMAGE_NT_HEADERS)((PIMAGE_NT_HEADERS)((PBYTE)hInst + (DWORD)pDoH->e_lfanew));
-
-    if (!pNtH) 
-    { 
-        Logger::logf(Err, "NTHeader was somehow NULL at ChangeImageSize\n");
-        return false;
-    }
-
-    UINT64 pEntry = (UINT64)&pNtH->OptionalHeader.SizeOfImage;
-
-    if (!VirtualProtect((LPVOID)pEntry, sizeof(DWORD), PAGE_EXECUTE_READWRITE, &protect))
-    {
-        Logger::logf(Err, "VirtualProtect failed at ChangeImageSize: %d\n", GetLastError());
-        return false;
-    }
-
-    if (pEntry)
-    {
-        __try
-        {
-            *(DWORD*)(pEntry) = newEntry;
-            VirtualProtect((LPVOID)pEntry, sizeof(DWORD), protect, &protect);
-            return true;
-        }
-        __except (EXCEPTION_EXECUTE_HANDLER)
-        {
-            VirtualProtect((LPVOID)pEntry, sizeof(DWORD), protect, &protect); //reset old protections
-            return false;
-        }
-    }
-
-    return false;
-}
-
-/*
-    ChangeSizeOfCode - modifies the `OptionalHeader.SizeOfCode` in the NT headers to throw off runtime querying by attackers
-    returns true on success
-*/
-bool Process::ChangeSizeOfCode(__in const DWORD newEntry) //modify the 'sizeofcode' variable in the optionalheader
-{
-    PIMAGE_DOS_HEADER pDoH;
-    PIMAGE_NT_HEADERS pNtH;
-    DWORD protect;
-    HINSTANCE hInst = GetModuleHandleW(NULL);
-
-    if (!hInst) 
-        return false;
-
-    pDoH = (PIMAGE_DOS_HEADER)(hInst);
-
-    pNtH = (PIMAGE_NT_HEADERS)((PIMAGE_NT_HEADERS)((PBYTE)hInst + (DWORD)pDoH->e_lfanew));
-
-    if (!pNtH)
-    {
-        Logger::logf(Err, " NTHeader was somehow NULL @ ChangeSizeOfCode\n");
-        return false;
-    }
-
-    UINT64 pEntry = (UINT64)&pNtH->OptionalHeader.SizeOfCode;
-
-    if (!VirtualProtect((LPVOID)pEntry, sizeof(DWORD), PAGE_EXECUTE_READWRITE, &protect))
-        return false;
-
-    if (pEntry)
-    {
-        __try
-        {
-            *(DWORD*)(pEntry) = newEntry;
-            VirtualProtect((LPVOID)pEntry, sizeof(DWORD), protect, &protect); //reset old protections
-            return true;
-        }
-        __except (EXCEPTION_EXECUTE_HANDLER)
-        {
-            VirtualProtect((LPVOID)pEntry, sizeof(DWORD), protect, &protect); //reset old protections
-            return false;
-        }
-    }
-    
-    return false;
-}
-
-/*
-    ChangeNumberOfSections - changes the number of sections in the NT Headers to `newSectionsCount`, which can stop attackers from traversing sections in our program
-    returns true on success
-*/
-bool Process::ChangeNumberOfSections(__in const string module, __in const  DWORD newSectionsCount)
-{
-    PIMAGE_SECTION_HEADER sectionHeader = 0;
-    HINSTANCE hInst = NULL;
-    PIMAGE_DOS_HEADER pDoH = 0;
-    PIMAGE_NT_HEADERS64 pNtH = 0;
-
-    hInst = GetModuleHandleA(module.c_str());
-
-    pDoH = (PIMAGE_DOS_HEADER)(hInst);
-
-    if (pDoH == NULL || hInst == NULL)
-    {
-        Logger::logf(Err, " PIMAGE_DOS_HEADER or hInst was NULL @ Process::ChangeNumberOfSections");
-        return false;
-    }
-
-    pNtH = (PIMAGE_NT_HEADERS64)((PIMAGE_NT_HEADERS64)((PBYTE)hInst + (DWORD)pDoH->e_lfanew));
-    sectionHeader = IMAGE_FIRST_SECTION(pNtH);
-
-    DWORD dwOldProt = 0;
-
-    if (!VirtualProtect((LPVOID)&pNtH->FileHeader.NumberOfSections, sizeof(DWORD), PAGE_EXECUTE_READWRITE, &dwOldProt))
-    {
-        Logger::logf(Err, " VirtualProtect failed @ Process::ChangeNumberOfSections");
-        return false;
-    }
-
-    memcpy((void*)&pNtH->FileHeader.NumberOfSections, (void*)&newSectionsCount, sizeof(DWORD));
-
-    if (!VirtualProtect((LPVOID)&pNtH->FileHeader.NumberOfSections, sizeof(DWORD), dwOldProt, &dwOldProt)) //reset page protections
-    {
-        Logger::logf(Err, " VirtualProtect (2nd call) failed @ Process::ChangeNumberOfSections");
-        return false;
-    }
-
-    return true;
-}
-
-/*
-    ChangeImageBase - Modifies the `OptionalHeader.ImageBase` variable in the NT headers, which might throw off attackers who query this variable
-    returns true on success
-*/
-bool Process::ChangeImageBase(__in const UINT64 newEntry)
-{
-    PIMAGE_DOS_HEADER pDoH;
-    PIMAGE_NT_HEADERS pNtH;
-    DWORD protect;
-    HINSTANCE hInst = GetModuleHandleW(NULL);
-
-    if (!hInst) return false;
-
-    pDoH = (PIMAGE_DOS_HEADER)(hInst);
-
-    pNtH = (PIMAGE_NT_HEADERS)((PIMAGE_NT_HEADERS)((PBYTE)hInst + (DWORD)pDoH->e_lfanew));
-
-    if (!pNtH)
-    {
-        Logger::logf(Err, "NTHeader was somehow NULL at ChangeImageBase\n");
-        return false;
-    }
-
-    UINT64 pEntry = (UINT64)&pNtH->OptionalHeader.ImageBase;
-
-    VirtualProtect((LPVOID)pEntry, sizeof(ULONGLONG), PAGE_EXECUTE_READWRITE, &protect);
-
-    if (pEntry)
-    {
-        __try
-        {
-            *(UINT64*)(pEntry) = newEntry;
-            VirtualProtect((LPVOID)pEntry, sizeof(DWORD), protect, &protect);
-            return true;
-        }
-        __except (EXCEPTION_EXECUTE_HANDLER)
-        {
-            VirtualProtect((LPVOID)pEntry, sizeof(DWORD), protect, &protect); //reset old protections
-            return false;
-        }
-    }
-
-    return false;
 }
 
 /*
@@ -568,13 +241,13 @@ list<DWORD> Process::GetProcessIdsByName(__in const wstring procName)
     GetSectionAddress - Get the address of a named section of the module with the named `moduleName`
     returns a memory address of the section if found, and 0 if no section is found or an error occurs
 */
-UINT64 Process::GetSectionAddress(__in const  char* moduleName, __in const  char* sectionName)
+UINT64 Process::GetSectionAddress(__in const HMODULE hModule, __in const  char* sectionName)
 {
-    HMODULE hModule = GetModuleHandleA(moduleName);
-
     if (hModule == NULL)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, " Failed to get module handle: %d @ GetSectionAddress\n", GetLastError());
+#endif
         return 0;
     }
 
@@ -583,14 +256,18 @@ UINT64 Process::GetSectionAddress(__in const  char* moduleName, __in const  char
     PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)baseAddress;
     if (pDosHeader->e_magic != IMAGE_DOS_SIGNATURE)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, " Invalid DOS header @ GetSectionAddress.\n");
+#endif
         return 0;
     }
 
     PIMAGE_NT_HEADERS pNtHeaders = (PIMAGE_NT_HEADERS)(baseAddress + pDosHeader->e_lfanew);
     if (pNtHeaders->Signature != IMAGE_NT_SIGNATURE)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, " Invalid NT header @ GetSectionAddress.\n");
+#endif
         return 0;
     }
 
@@ -608,8 +285,9 @@ UINT64 Process::GetSectionAddress(__in const  char* moduleName, __in const  char
 
         pSectionHeader++;
     }
-
+#ifdef LOGGING_ENABLED
     Logger::logf(Warning, ".text section not found.\n");
+#endif
     return 0;
 }
 
@@ -630,7 +308,7 @@ BYTE* Process::GetBytesAtAddress(__in const UINT64 address, __in const  UINT siz
     {
         delete[] memBytes;
         memBytes = nullptr;
-        return NULL;
+        return nullptr;
     }
 }
 
@@ -644,7 +322,9 @@ list<ProcessData::ImportFunction*> Process::GetIATEntries()
 
     if (hModule == NULL)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "Couldn't fetch module handle @ Process::GetIATEntries ");
+#endif
         return (list<ProcessData::ImportFunction*>)NULL;
     }
 
@@ -652,7 +332,9 @@ list<ProcessData::ImportFunction*> Process::GetIATEntries()
 
     if (dosHeader == nullptr)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "Couldn't fetch dosHeader @ Process::GetIATEntries ");
+#endif
         return (list<ProcessData::ImportFunction*>)NULL;
     }
 
@@ -693,19 +375,14 @@ list<ProcessData::ImportFunction*> Process::GetIATEntries()
 DWORD Process::GetModuleSize(__in const HMODULE hModule)
 {
     if (hModule == NULL) 
-    {
         return 0;
-    }
 
     MODULEINFO moduleInfo;
 
     if (!GetModuleInformation(GetCurrentProcess(), hModule, &moduleInfo, sizeof(moduleInfo))) 
-    {
         return 0;
-    }
-
-    DWORD moduleSize = moduleInfo.SizeOfImage;
-    return moduleSize;
+    
+    return moduleInfo.SizeOfImage;
 }
 
 /*
@@ -743,7 +420,9 @@ bool Process::FillModuleList()
                 }
                 else
                 {
+#ifdef LOGGING_ENABLED
                     Logger::logf(Err, "Unable to parse module information @ Process::FillModuleList");
+#endif
                     return false;
                 }
 
@@ -751,51 +430,22 @@ bool Process::FillModuleList()
             }
             else
             {
+#ifdef LOGGING_ENABLED
                 Logger::logf(Err, "Unable to parse module named @ Process::FillModuleList");
+#endif
                 return false;
             }
         }
     }
     else
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "EnumProcessModules failed @ Process::FillModuleList");
+#endif
         return false;
     }
 
     return true;
-}
-
-/*
-    ModifyTLSCallbackPtr - changes the program TLS callback at runtime by modifying the data directory ptr (IMAGE_DIRECTORY_ENTRY_TLS)
-    returns true on success
-*/
-bool Process::ModifyTLSCallbackPtr(__in const UINT64 NewTLSFunction)
-{
-    HMODULE hModule = GetModuleHandle(NULL);
-    IMAGE_DOS_HEADER* dosHeader = (IMAGE_DOS_HEADER*)hModule;
-    IMAGE_NT_HEADERS* ntHeader = (IMAGE_NT_HEADERS*)((BYTE*)dosHeader + dosHeader->e_lfanew);
-
-    IMAGE_TLS_DIRECTORY* tlsDir = (IMAGE_TLS_DIRECTORY*)((BYTE*)hModule + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].VirtualAddress);
-
-    if (tlsDir == nullptr)
-        return false;
-
-    DWORD dwOldProt = 0;
-    if (VirtualProtect((LPVOID)tlsDir->AddressOfCallBacks, sizeof(UINT64), PAGE_EXECUTE_READWRITE, &dwOldProt))
-    {
-        __try
-        {
-            memcpy((void*)(tlsDir->AddressOfCallBacks), (const void*)&NewTLSFunction, sizeof(UINT64));
-            return true;
-        }
-        __except (EXCEPTION_EXECUTE_HANDLER)
-        {
-            Logger::logf(Err, "Failed to write TLS callback ptr  @ Process::ModifyTLSCallbackPtr");
-            return false;
-        }
-    }
-
-    return false;
 }
 
 /*
@@ -846,7 +496,9 @@ FARPROC Process::_GetProcAddress(__in const PCSTR Module, __in const LPCSTR lpPr
         }
         else
         {
+#ifdef LOGGING_ENABLED
             Logger::logf(Err, "ImageExportDirectory was NULL @ Process::_GetProcAddress with module %s and function %s", Module, lpProcName);
+#endif
             UnMapAndLoad(&LoadedImage);
             return NULL;
         }
@@ -855,7 +507,9 @@ FARPROC Process::_GetProcAddress(__in const PCSTR Module, __in const LPCSTR lpPr
     }
     else
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "MapAndLoad failed @ Process::_GetProcAddress with module %s and function %s", Module, lpProcName);
+#endif
         return (FARPROC)NULL;
     }
 
@@ -870,35 +524,36 @@ bool Process::IsReturnAddressInModule(__in const UINT64 RetAddr, __in const  wch
 {
     if (RetAddr == 0)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "RetAddr was 0 @ : Process::IsReturnAddressInModule");
+#endif
         return false;
     }
 
     HMODULE retBase = 0;
 
     if (module == NULL)
-    {
-        retBase = (HMODULE)GetModuleHandleW(NULL);
-    }
-    else
-    {
+        retBase = (HMODULE)GetModuleHandleW(NULL);   
+    else 
         retBase = (HMODULE)GetModuleHandleW(module);
-    }
+
+    if (retBase == 0)
+        return false;
 
     DWORD size = Process::GetModuleSize(retBase);
 
     if (size == 0)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "size was 0 @ : Process::IsReturnAddressInModule");
+#endif
         return false;
     }
 
-    if (RetAddr >= (UINT64)retBase && RetAddr < ((UINT64)retBase + size))
-    {
+    if (RetAddr >= (UINT64)retBase && RetAddr < ((UINT64)retBase + size))    
         return true;
-    }
-
-    return false;
+    else
+        return false;
 }
 
 /*
@@ -921,18 +576,24 @@ wstring Process::GetProcessName(__in const DWORD pid)
             }
             else 
             {
+#ifdef LOGGING_ENABLED
                 Logger::logf(Err, "GetModuleBaseName failed with error %d @  Process::GetProcessName", GetLastError());
+#endif
             }
         }
         else 
         {
+#ifdef LOGGING_ENABLED
             Logger::logf(Err, "EnumProcessModules failed with error %d @  Process::GetProcessName", GetLastError());
+#endif
         }
         CloseHandle(hProcess);
     }
     else 
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "OpenProcess failed with error %d @  Process::GetProcessName", GetLastError());
+#endif
     }
 
     return processName;
@@ -1074,14 +735,18 @@ DWORD Process::GetTextSectionSize(__in const HMODULE hModule)
     PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)hModule;
     if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "Invalid DOS signature @ GetTextSectionSize");
+#endif
         return 0;
     }
 
     PIMAGE_NT_HEADERS ntHeaders = (PIMAGE_NT_HEADERS)((BYTE*)hModule + dosHeader->e_lfanew);
     if (ntHeaders->Signature != IMAGE_NT_SIGNATURE)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "Invalid NT signature @ GetTextSectionSize");
+#endif
         return 0;
     }
 
@@ -1095,7 +760,7 @@ DWORD Process::GetTextSectionSize(__in const HMODULE hModule)
         }
     }
 
-    return 0;
+    return 0; //failure case, could not find .text section
 }
 
 /*
@@ -1125,7 +790,7 @@ HMODULE Process::GetRemoteModuleBaseAddress(__in const DWORD processId, __in con
     return hModule;
 }
 
-bool Process::GetRemoteTextSection(__in const HANDLE hProcess, __out uintptr_t& baseAddress, __out SIZE_T& sectionSize)
+bool Process::GetProcessTextSection(__in const HANDLE hProcess, __out uintptr_t& baseAddress, __out SIZE_T& sectionSize)
 {
     HMODULE hModule = nullptr;
     MODULEENTRY32 me32;
@@ -1191,16 +856,20 @@ std::vector<BYTE> Process::ReadRemoteTextSection(__in const DWORD pid)
 
     if (!hProcess) 
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "Failed to open process. Error: %d", GetLastError());
+#endif
         return {};
     }
 
     uintptr_t baseAddress = 0;
     SIZE_T sectionSize = 0;
 
-    if (!GetRemoteTextSection(hProcess, baseAddress, sectionSize)) 
+    if (!GetProcessTextSection(hProcess, baseAddress, sectionSize)) 
     {
+#ifdef LOGGING_ENABLED
         Logger::log(Err, "Failed to find the .text section.");
+#endif
         CloseHandle(hProcess);
         return {};
     }
@@ -1210,7 +879,9 @@ std::vector<BYTE> Process::ReadRemoteTextSection(__in const DWORD pid)
     SIZE_T bytesRead = 0;
     if (!ReadProcessMemory(hProcess, reinterpret_cast<LPCVOID>(baseAddress), buffer.data(), sectionSize, &bytesRead)) 
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "Failed to read memory. Error: %d",  GetLastError());
+#endif
         CloseHandle(hProcess);
         return {};
     }

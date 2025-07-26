@@ -82,7 +82,9 @@ public:
 		
 		if (!FillModuleList())
 		{
-			Logger::logf(Err, "Unable to traverse loaded modules @ ::Process() .\n");
+#ifdef LOGGING_ENABLED
+			Logger::logf(Err, "Unable to traverse loaded modules @ Process::Process()");
+#endif
 		}
 
 		DWORD parentPid = GetParentProcessId();
@@ -94,10 +96,10 @@ public:
 		}
 		else
 		{
-			Logger::logf(Warning, "Could not fetch parent process ID");
+#ifdef LOGGING_ENABLED
+			Logger::logf(Warning, "Could not fetch parent process ID @ Process::Process");
+#endif
 		}
-
-		//Process::SetNumSections(nProgramSections); //save original # of program sections so that we can modify NumberOfSections in the NT headers and still achieve program functionality
 	}
 
 	~Process()
@@ -130,23 +132,11 @@ public:
 	void SetParentName(__in const wstring parentName) { this->_ParentProcessName = parentName; }
 	void SetParentId(__in const uint32_t id) { this->_ParentProcessId = id; }
 
-	static bool ChangeModuleName(__in const  wstring szModule, __in const  wstring newName); //these `ChangeXYZ` routines all modify aspects of the PEB
-	static bool ChangeModuleBase(__in const  wchar_t* szModule, __in const  uint64_t moduleBaseAddress);
-	static bool ChangeModulesChecksum(__in const  wchar_t* szModule, __in const DWORD checksum);
-	static bool ChangePEEntryPoint(__in const DWORD newEntry);
-	static bool ChangeImageSize(__in const DWORD newImageSize);
-	static bool ChangeSizeOfCode(__in const DWORD newSizeOfCode);
-	static bool ChangeImageBase(__in const UINT64 newImageBase);
-	static bool ChangeNumberOfSections(__in const string module, __in const DWORD newSectionsCount);
-	
-	static bool ModifyTLSCallbackPtr(__in const UINT64 NewTLSFunction);
-
-
 	static bool HasExportedFunction(__in const string dllName, __in const string functionName);
 
 	static FARPROC _GetProcAddress(__in const PCSTR Module, __in const  LPCSTR lpProcName); //GetProcAddress without winAPI call
 
-	static UINT64 GetSectionAddress(__in const  char* moduleName, __in const  char* sectionName);
+	static UINT64 GetSectionAddress(__in const HMODULE hMod, __in const  char* sectionName);
 
 	static BYTE* GetBytesAtAddress(__in const UINT64 address, __in const UINT size);
 
@@ -165,7 +155,7 @@ public:
 
 	static HMODULE GetRemoteModuleBaseAddress(__in const DWORD processId, __in const  wchar_t* moduleName);
 
-	static bool GetRemoteTextSection(__in const HANDLE hProcess, __out uintptr_t& baseAddress, __out SIZE_T& sectionSize);
+	static bool GetProcessTextSection(__in const HANDLE hProcess, __out uintptr_t& baseAddress, __out SIZE_T& sectionSize);
 	static std::vector<BYTE> ReadRemoteTextSection(__in const DWORD pid); //fetch .text of a running process (can improve this by making it any section instead of just .text)
 
 private:

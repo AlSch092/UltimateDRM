@@ -135,6 +135,8 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 			throw std::runtime_error("Integrity check failed: main module checksum mismatch");
 		}
 
+		uint64_t textSectionAddr = Process::GetSectionAddress(GetModuleHandle(NULL), ".text");
+
 		this_thread::sleep_for(std::chrono::seconds(10));
 	}
 }

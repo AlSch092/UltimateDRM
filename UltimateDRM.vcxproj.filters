@@ -162,6 +162,9 @@
     <ClInclude Include="include\DebuggerDetections.hpp">
       <Filter>include\AntiDebug</Filter>
     </ClInclude>
+    <ClInclude Include="include\DRMException.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="lib\brotlicommon.lib">
