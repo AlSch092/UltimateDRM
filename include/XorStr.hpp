@@ -81,6 +81,16 @@ public:
         }
     }
 
+    std::wstring decrypt() const
+    {
+		std::wstring output(N, L'\0');
+		for (std::size_t i = 0; i < N; ++i)
+		{
+			output[i] = decrypt_wchar(encrypted[i], XorKey, i);
+		}
+		return output;
+    }
+
     constexpr int getSize() const { return N; }
 };
 

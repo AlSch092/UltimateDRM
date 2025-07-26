@@ -51,12 +51,19 @@ namespace Debugger
 #endif
             }
 
-            CommonDebuggerProcesses.push_back(L"x64dbg.exe"); //strings should be encrypted in a live environment
-            CommonDebuggerProcesses.push_back(L"CheatEngine.exe");
-            CommonDebuggerProcesses.push_back(L"idaq64.exe");
-            CommonDebuggerProcesses.push_back(L"cheatengine-x86_64-SSE4-AVX2.exe");
-            CommonDebuggerProcesses.push_back(L"kd.exe");
-            CommonDebuggerProcesses.push_back(L"DbgX.Shell.exe");
+			auto x64Dbg_str = make_encrypted(L"x64dbg.exe"); //these will be encrypted at compile time, not leaving plaintext in data sections
+            auto CE_str = make_encrypted(L"CheatEngine.exe"); //ideally this would be done with an LLVM pass
+			auto idaq64_str = make_encrypted(L"idaq64.exe");
+			auto CE_x86_64_str = make_encrypted(L"cheatengine-x86_64-SSE4-AVX2.exe");
+			auto kd_str = make_encrypted(L"kd.exe");
+			auto dbgX_str = make_encrypted(L"DbgX.Shell.exe");
+
+            CommonDebuggerProcesses.push_back(x64Dbg_str.decrypt());
+            CommonDebuggerProcesses.push_back(CE_str.decrypt());
+            CommonDebuggerProcesses.push_back(idaq64_str.decrypt());
+            CommonDebuggerProcesses.push_back(CE_x86_64_str.decrypt());
+            CommonDebuggerProcesses.push_back(kd_str.decrypt());
+            CommonDebuggerProcesses.push_back(dbgX_str.decrypt());
         }
 
         ~AntiDebug()

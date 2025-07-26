@@ -156,14 +156,14 @@
     <ClInclude Include="include\Definitions.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="include\AntiDebugger.hpp">
-      <Filter>include\AntiDebug</Filter>
-    </ClInclude>
-    <ClInclude Include="include\DebuggerDetections.hpp">
-      <Filter>include\AntiDebug</Filter>
-    </ClInclude>
     <ClInclude Include="include\DRMException.hpp">
       <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AntiDebug\AntiDebugger.hpp">
+      <Filter>include\AntiDebug</Filter>
+    </ClInclude>
+    <ClInclude Include="include\AntiDebug\DebuggerDetections.hpp">
+      <Filter>include\AntiDebug</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

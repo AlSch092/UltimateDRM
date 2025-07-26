@@ -1,5 +1,6 @@
 # Changelog - UltimateDRM
 
+- July 25 2025: Add hypervisor checks, add DRMExceptions class, clean up Process class  
 - July 24 2025: Added blocking unknown threads via TLS callbacks, anti-debug code  
 - July 22 2025: Added blocking of multiple process instances  
 - July 21 2025: Added TLS callbacks, vectored exception handler, start of licensing code  
