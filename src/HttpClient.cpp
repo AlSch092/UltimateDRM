@@ -1,11 +1,17 @@
 //By AlSch092 @github
 #include "../include/HttpClient.hpp"
 
-/*
-    ReadWebPage - returns contents at `url` using cURL library
-    returns empty string on failure
-*/
-bool HttpClient::ReadWebPage(__inout HttpRequest& requestInfo) //GET request
+/**
+ * @brief Sends a GET HTTP request to a specified URL
+ *
+ * @param requestInfo Structure containing request data, along with response text
+ *
+ * @return true/false if request was successful
+ *
+ * @usage
+ * bool wasSuccess = HttpClient::ReadWebPage(requestInfo);
+ */
+bool HttpClient::GetRequest(__inout HttpRequest& requestInfo) //GET request
 {
     const int OPERATION_TIMEOUT = 15L;
     const int CONNECT_TIMEOUT = 15L;
@@ -76,6 +82,16 @@ cleanup:
     return wasSuccess;
 }
 
+/**
+ * @brief Sends a POST HTTP request to a specified URL
+ *
+ * @param requestInfo Structure containing request data, along with response text
+ *
+ * @return true/false if request was successful
+ *
+ * @usage
+ * bool wasSuccess = HttpClient::PostRequest(requestInfo);
+ */
 bool HttpClient::PostRequest(__inout HttpRequest& requestInfo)
 {
     bool wasSuccess = false;

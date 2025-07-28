@@ -150,19 +150,18 @@ returns the pid of the current process parent process. used to check for illegal
 */
 DWORD Process::GetParentProcessId()
 {
-    HANDLE hSnapshot = NULL;
-    PROCESSENTRY32 pe32;
-    DWORD ppid = 0, pid = GetCurrentProcessId();
+    DWORD ppid = 0;
+    DWORD pid = GetCurrentProcessId();
 
-    hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    __try 
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnapshot == INVALID_HANDLE_VALUE)
+        return 0;
+
+    PROCESSENTRY32 pe32 = {};
+    pe32.dwSize = sizeof(PROCESSENTRY32);
+
+    if (Process32First(hSnapshot, &pe32)) 
     {
-        if (hSnapshot == INVALID_HANDLE_VALUE) __leave;
-
-        ZeroMemory(&pe32, sizeof(pe32));
-        pe32.dwSize = sizeof(pe32);
-        if (!Process32First(hSnapshot, &pe32)) __leave;
-
         do 
         {
             if (pe32.th32ProcessID == pid) 
@@ -171,13 +170,9 @@ DWORD Process::GetParentProcessId()
                 break;
             }
         } while (Process32Next(hSnapshot, &pe32));
+    }
 
-    }
-    __finally 
-    {
-        if (hSnapshot != INVALID_HANDLE_VALUE && hSnapshot != 0) 
-            CloseHandle(hSnapshot);
-    }
+    CloseHandle(hSnapshot);
     return ppid;
 }
 

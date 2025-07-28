@@ -34,7 +34,7 @@ class HttpClient //a simple class for making web/http requests.
 {
 public:
 
-    static bool ReadWebPage(__inout HttpRequest& requestInfo);
+    static bool GetRequest(__inout HttpRequest& requestInfo);
     static bool PostRequest(__inout HttpRequest& requestInfo);
 
 private:

@@ -1,10 +1,19 @@
 //By AlSch092 @ Github
 #include "../include/Thread.hpp"
 
-/*
-    Thread::BeginExecution - Managed thread creation & start
-    return `true` on success, `false` on failure
-*/
+/**
+ * @brief Starts execution of the current class object's thread
+ *
+ * @param toExecute The function pointer to the thread routine to execute
+ * @param lpOptionalParam Additional argument to pass to the thread routine
+ * @param shouldRunForever If true, the thread will run indefinitely until signaled to stop
+ * @param shouldDetach If true, the thread will be detached from the caller thread, allowing it to run independently
+ * 
+ * @return true/false if the thread was successfully started
+ *
+ * @usage
+ * bool threadStarted = ThreadObj->BeginExecution(MyThreadFunction, myParam, true, false);
+ */
 bool Thread::BeginExecution(LPTHREAD_START_ROUTINE toExecute, LPVOID lpOptionalParam, bool shouldRunForever, bool shouldDetach)
 {
     if (toExecute != NULL)
@@ -42,6 +51,17 @@ bool Thread::BeginExecution(LPTHREAD_START_ROUTINE toExecute, LPVOID lpOptionalP
         return false;
     }
 }
+
+/**
+ * @brief Checks if object's thread is currently running
+ *
+ * @param threadHandle Handle to the thread to check
+ *
+ * @return true/false if the thread is currently running or not
+ *
+ * @usage
+ * bool isThreadRunning = Thread::IsThreadRunning(myThreadHandle);
+ */
 bool Thread::IsThreadRunning(HANDLE threadHandle)
 {
     if (threadHandle == NULL)
@@ -59,10 +79,16 @@ bool Thread::IsThreadRunning(HANDLE threadHandle)
     return false;
 }
 
-/*
-    IsThreadSuspended - checks if a thread is currently suspended by suspending it
-    has its drawbacks since it suspends threads very briefly, but it works fine
-*/
+/**
+ * @brief Checks if object's thread is currently suspended
+ *
+ * @param tid Thread ID of the thread to check
+ *
+ * @return true/false if the thread is currently suspended or not
+ *
+ * @usage
+ * bool isThreadSuspended = Thread::IsThreadSuspended(GetCurrentThreadId());
+ */
 bool Thread::IsThreadSuspended(DWORD tid)
 {
     if (tid == 0)

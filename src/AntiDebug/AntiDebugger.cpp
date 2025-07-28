@@ -91,7 +91,6 @@ void Debugger::AntiDebug::CheckForDebugger(LPVOID AD)
 	}
 }
 
-
 /*
 	_IsHardwareDebuggerPresent - suspends threads + Checks debug registers for Dr0-3,6,7 being > 0
 */

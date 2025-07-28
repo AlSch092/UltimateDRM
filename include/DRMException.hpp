@@ -24,8 +24,8 @@ public:
 		IntegrityCheckFailed,
 		DebuggerDetected,
 		MultipleInstancesDetected,
-		ServiceLoadFailed,
-		ServiceUnloadFailed
+		ServiceUnloadFailed,
+		BadParentProcess
 	};
 
 	DRMException(ErrorCode err) : err(err) {}
@@ -49,7 +49,7 @@ private:
 		{ IntegrityCheckFailed, "Integrity check failed" },
 		{ DebuggerDetected, "Debugger detected" },
 		{ MultipleInstancesDetected, "Multiple instances of the application are not allowed" },
-		{ ServiceLoadFailed, "Failed to load required service" },
-		{ ServiceUnloadFailed, "Failed to unload required service" }
+		{ ServiceUnloadFailed, "Failed to unload required service" },
+		{ BadParentProcess, "Parent process is not allowed" }
 	};
 };

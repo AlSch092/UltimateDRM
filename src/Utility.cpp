@@ -1,6 +1,15 @@
 //By AlSch092 @ github
 #include "../include/Utility.hpp"
 
+/**
+ * @brief Generates a random string of specified length
+ *
+ * @param length size of the string to generate
+ * @return string object containing the random string
+ *
+ * @usage
+ * string randomStr = Utility::GenerateRandomString(16);
+ */
 string Utility::GenerateRandomString(__in const int length)
 {
     if (length <= 0) return "";
@@ -26,6 +35,15 @@ string Utility::GenerateRandomString(__in const int length)
     return randomString;
 }
 
+/**
+ * @brief Generates a random wide string of specified length
+ *
+ * @param length size of the string to generate
+ * @return wide string object containing the random string
+ *
+ * @usage
+ * wstring randomStr = Utility::GenerateRandomWString(16);
+ */
 wstring Utility::GenerateRandomWString(__in const int length)
 {
     if (length <= 0) return L"";
@@ -51,6 +69,15 @@ wstring Utility::GenerateRandomWString(__in const int length)
     return randomString;
 }
 
+/*
+ * @brief Converts a string to lowercase in-place
+ *
+ * @param str Pointer to the string to convert
+ *
+ * @usage
+ * char myString[] = "Hello World!";
+ * Utility::str_to_lower(myString);
+ */ 
 void Utility::str_to_lower(__inout char* str)
 {
     while (*str)
@@ -60,6 +87,16 @@ void Utility::str_to_lower(__inout char* str)
     }
 }
 
+/*
+ * @brief Finds the first occurrence of a substring in a string, case-insensitively
+ *
+ * @param haystack The string to search in
+ * @param needle The substring to search for
+ * @return Pointer to the first occurrence of needle in haystack, or nullptr if not found
+ *
+ * @usage
+ * char* result = Utility::strstr_case_insensitive("Hello World", "world");
+ */ 
 char* Utility::strstr_case_insensitive(__in const char* haystack, __in const char* needle)
 {
     if (!haystack || !needle)
@@ -100,6 +137,16 @@ char* Utility::strstr_case_insensitive(__in const char* haystack, __in const cha
     return final_result;
 }
 
+/*
+ * @brief Compares two strings case-insensitively
+ *
+ * @param s1 First string to compare
+ * @param s2 Second string to compare
+ * @return true if the strings are equal, false otherwise
+ *
+ * @usage
+ * bool isEqual = Utility::strcmp_insensitive("Hello", "hello");
+ */ 
 bool Utility::strcmp_insensitive(__in const char* s1, __in const char* s2)
 {
     if (s1 == NULL || s2 == NULL)
@@ -122,6 +169,16 @@ bool Utility::strcmp_insensitive(__in const char* s1, __in const char* s2)
     return true;
 }
 
+/*
+ * @brief Compares two wide strings case-insensitively
+ *
+ * @param s1 First wide string to compare
+ * @param s2 Second wide string to compare
+ * @return true if the wide strings are equal, false otherwise
+ *
+ * @usage
+ * bool isEqual = Utility::wcscmp_insensitive(L"Hello", L"hello");
+ */
 bool Utility::wcscmp_insensitive(__in const wchar_t* s1, __in const wchar_t* s2)
 {
     if (s1 == NULL || s2 == NULL)
@@ -144,6 +201,15 @@ bool Utility::wcscmp_insensitive(__in const wchar_t* s1, __in const wchar_t* s2)
     return true;
 }
 
+/*
+ * @brief Converts a wide string to a standard string
+ *
+ * @param wstr Wide string to convert
+ * @return Standard string representation of the wide string
+ *
+ * @usage
+ * std::string str = Utility::ConvertWStringToString(L"Hello World");
+ */ 
 std::string Utility::ConvertWStringToString(__in const std::wstring& wstr)
 {
     std::locale loc("");
@@ -151,12 +217,31 @@ std::string Utility::ConvertWStringToString(__in const std::wstring& wstr)
     return conv.to_bytes(wstr);
 }
 
+/*
+ * @brief Converts a standard string to a wide string
+ *
+ * @param str Standard string to convert
+ * @return Wide string representation of the standard string
+ *
+ * @usage
+ * std::wstring wstr = Utility::ConvertStringToWString("Hello World");
+ */
 std::wstring Utility::ConvertStringToWString(__in const std::string& str)
 {
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
     return converter.from_bytes(str);
 }
 
+/*
+ * @brief Splits a string by spaces and returns a vector of strings
+ *
+ * @param str Pointer to the string to split
+ * @return Vector of strings containing the split parts
+ *
+ * @usage
+ * char myString[] = "Hello World from Utility";
+ * std::vector<std::string> parts = Utility::splitStringBySpace(myString);
+ */ 
 std::vector<std::string> Utility::splitStringBySpace(__in char* str)
 {
     std::vector<std::string> result;
@@ -169,6 +254,16 @@ std::vector<std::string> Utility::splitStringBySpace(__in char* str)
     return result;
 }
 
+/*
+ * @brief Adds a unique string to a list if it does not already exist
+ *
+ * @param strList Reference to the list of strings
+ * @param str String to add
+ *
+ * @usage
+ * std::list<std::string> myList;
+ * Utility::addUniqueString(myList, "Hello");
+ */
 void Utility::addUniqueString(__inout std::list<std::string>& strList, __in const std::string& str)
 {
     if (find(strList.begin(), strList.end(), str) == strList.end())
@@ -177,6 +272,18 @@ void Utility::addUniqueString(__inout std::list<std::string>& strList, __in cons
     }
 }
 
+/*
+ * @brief Checks if all elements in list1 are present in list2
+ *
+ * @param list1 First list of strings
+ * @param list2 Second list of strings
+ * @return true if all elements in list1 are in list2, false otherwise
+ *
+ * @usage
+ * std::list<std::string> list1 = {"Hello", "World"};
+ * std::list<std::string> list2 = {"Hello", "World", "!"};
+ * bool result = Utility::areAllElementsInList(list1, list2);
+ */
 bool Utility::areAllElementsInList(__in const std::list<std::string>& list1, __in const std::list<std::string>& list2)
 {
     for (const auto& str : list1)
@@ -189,6 +296,15 @@ bool Utility::areAllElementsInList(__in const std::list<std::string>& list1, __i
     return true; //elements in list1 are in list2
 }
 
+/*
+ * @brief Converts a wide string to lowercase
+ *
+ * @param str Wide string to convert
+ * @return Lowercase wide string
+ *
+ * @usage
+ * std::wstring lowerStr = Utility::ToLower(L"Hello World");
+ */
 std::wstring Utility::ToLower(__in const std::wstring& str) 
 {
     std::wstring lowerStr = str;
@@ -196,6 +312,16 @@ std::wstring Utility::ToLower(__in const std::wstring& str)
     return lowerStr;
 }
 
+/*
+ * @brief Checks if a wide string contains another wide string, case-insensitively
+ *
+ * @param haystack The wide string to search in
+ * @param needle The wide string to search for
+ * @return true if needle is found in haystack, false otherwise
+ *
+ * @usage
+ * bool found = Utility::ContainsWStringInsensitive(L"Hello World", L"world");
+ */ 
 bool Utility::ContainsWStringInsensitive(__in const std::wstring& haystack, __in const std::wstring& needle) 
 {
     std::wstring lowerHaystack = ToLower(haystack);

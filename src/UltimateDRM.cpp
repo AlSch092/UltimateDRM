@@ -101,20 +101,22 @@ struct DRM::Impl
 			throw std::runtime_error("Could not initialize smart ptrs: " + std::string(ex.what()));
 		}
 
-		try
+#ifndef _DEBUG
+		if (Settings::Instance->bUseAntiDebugging)
 		{
-			if (Settings::Instance->bUseAntiDebugging)
+			try
 			{
 				this->AntiDebugger = std::make_unique<DebuggerDetections>(Settings::Instance);
-				this->AntiDebugger->StartAntiDebugThread();
+				//this->AntiDebugger->StartAntiDebugThread();
+			}
+			catch (const std::bad_alloc& ex)
+			{
+				throw std::runtime_error("Could not initialize AntiDebugger: " + std::string(ex.what()));
 			}
 		}
-		catch (const std::bad_alloc& ex)
-		{
-			throw std::runtime_error("Could not initialize AntiDebugger: " + std::string(ex.what()));
-		}
-	}
 
+	}
+#endif
 	~Impl() 
 	{
 		 this->ProtectedSettings->Reset();
@@ -161,10 +163,21 @@ bool DRM::Protect()
 			throw std::runtime_error("LicenseManagerPtr is not initialized");
 		}
 
-		if (!this->pImpl->LicenseManagerPtr->VerifyLicense())
+		if (!Settings::Instance->bAllowOfflineUsage)
 		{
-			throw DRMException(DRMException::LicenseVerificationFailed);
+			if (!this->pImpl->LicenseManagerPtr->VerifyLicenseOnline(false))
+			{
+				throw DRMException(DRMException::LicenseVerificationFailed);
+			}
 		}
+		else
+		{
+			if (!this->pImpl->LicenseManagerPtr->VerifyLicense())
+			{
+				throw DRMException(DRMException::LicenseVerificationFailed);
+			}
+		}
+
 	}
 
 	if (!Settings::Instance->allowedParents.empty()) //check parent process
@@ -198,7 +211,14 @@ bool DRM::Protect()
 				verifiedParent = true;
 				break; //if we don't require code signing, just check the process name
 			}
+		}
 
+		if (!verifiedParent)
+		{
+#ifdef LOGGING_ENABLED
+			Logger::logf(Err, "Could not initialize program: Parent process is not allowed or does not have a valid code signature");
+#endif
+			throw DRMException::BadParentProcess;
 		}
 	}
 
@@ -254,7 +274,6 @@ bool DRM::Protect()
 					hypervisorVendor == "KVMKVMKVM" ||
 					hypervisorVendor == "VMwareVMware" ||
 					hypervisorVendor == "XenVMMXenVMM" ||
-					hypervisorVendor == "prl hyperv" ||
 					hypervisorVendor == "VBoxVBoxVBox")
 				{
 #ifdef LOGGING_ENABLED

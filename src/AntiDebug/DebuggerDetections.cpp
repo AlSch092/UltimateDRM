@@ -146,7 +146,6 @@ bool DebuggerDetections::_IsDebuggerPresent_DbgBreak()
 #endif
 
 	this->AddFlagged(DebuggerMethod::DEBUG_DBG_BREAK);
-	__fastfail(1); //code should not reach here unless process is being debugged
 	return true;
 #endif
 }

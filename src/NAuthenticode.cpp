@@ -1,18 +1,33 @@
 #include "../include/NAuthenticode.hpp"
 
-/*
-    HasSignature - check if `filePath` has a valid embedded signature or a valid catalog sig file
-    returns `TRUE` if the `filePath` is properly signed
-*/
+/**
+ * @brief Checks code signature of a file through either embedded signature or catalog signature
+ *
+ * @param filePath The file path to the executable or DLL to check
+ * @param checkEndCertRevoked Whether or not to check if the end certificate is revoked
+ *
+ * @return true/false if `filePath` has a valid signature
+ *
+ * @usage
+ * BOOL isSigned = Authenticode::HasSignature(L"myfile.exe", TRUE);
+ */
 BOOL Authenticode::HasSignature(__in const LPCWSTR filePath, __in const  BOOL checkEndCertRevoked)
 {
     return (Authenticode::VerifyEmbeddedSignature(filePath, checkEndCertRevoked) || Authenticode::VerifyCatalogSignature(filePath, checkEndCertRevoked));
 }
 
-/*
-    VerifyEmbeddedSignature - checks embedded signature in `filePath`
-    returns `TRUE` if the file has a properly signed embedded signature
-*/
+/**
+ * @brief Checks code signature of a file through its embedded signature
+ *
+ *
+ * @param filePath The file path to the executable or DLL to check
+ * @param checkEndCertRevoked Whether or not to check if the end certificate is revoked
+ *
+ * @return true/false if `filePath` has a valid embedded signature
+ *
+ * @usage
+ * BOOL hasEmbeddedSig = Authenticode::VerifyEmbeddedSignature(L"myfile.exe", TRUE);
+ */
 BOOL Authenticode::VerifyEmbeddedSignature(__in const LPCWSTR filePath, __in const  BOOL checkRevoked)
 {
     WINTRUST_FILE_INFO fileData;
@@ -48,9 +63,11 @@ BOOL Authenticode::VerifyEmbeddedSignature(__in const LPCWSTR filePath, __in con
 
         if (status == CERT_E_REVOKED || status == CERT_E_EXPIRED || status == CERT_E_UNTRUSTEDROOT || status == CERT_E_CHAINING)
         {
+#ifdef LOGGING_ENABLED
 			Logger::log(LogType::Detection, "Revoked or expired signature detected");
+#endif
 			return FALSE;
-	}
+	    }
     }
 
     /* success, cleanup */
@@ -60,16 +77,26 @@ BOOL Authenticode::VerifyEmbeddedSignature(__in const LPCWSTR filePath, __in con
     return TRUE;
 }
 
-/*
-    VerifyCatalogSignature - checks the OS's database for any known catalogs for `filePath`
-    returns `TRUE` if the file has a verified signature
-*/
+
+/**
+ * @brief Checks code signature of a file through its catalog file
+ *
+ * @param filePath The file path to the executable or DLL to check
+ * @param checkEndCertRevoked Whether or not to check if the end certificate is revoked
+ *
+ * @return true/false if `filePath` has a valid catalog signature
+ *
+ * @usage
+ * BOOL hasEmbeddedSig = Authenticode::VerifyCatalogSignature(L"myfile.exe", TRUE);
+ */
 BOOL Authenticode::VerifyCatalogSignature(__in const LPCWSTR filePath, __in const BOOL checkRevoked)
 {
     HANDLE hFile = CreateFileW(filePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) 
     {
+#ifdef LOGGING_ENABLED
         Logger::logfw(LogType::Warning, L"Could not open file: %s @ VerifyCatalogSignature", filePath);
+#endif
         return false;
     }
 
@@ -153,10 +180,18 @@ BOOL Authenticode::VerifyCatalogSignature(__in const LPCWSTR filePath, __in cons
     return lStatus == ERROR_SUCCESS;
 }
 
-/*
-    GetDateOfTimeStamp - Checks the date of a cert's timestamp
-    returns `TRUE` on success, filling `st` with valid information
-*/
+/**
+ * @brief Checks the date of the time stamp of a signer info structure
+ *
+ * @param pSignerInfo Structure representing information about the cert signer
+ * @param st          Structure representing a date timestamp, which is written to by the function
+ *
+ * @return true/false if successfully writes to `st` vargument
+ *
+ * @usage
+ * SYSTEMTIME st = { 0 };
+ * BOOL success = Authenticode::GetDateOfTimeStamp(pSignerInfo, &st); 
+ */
 BOOL Authenticode::GetDateOfTimeStamp(PCMSG_SIGNER_INFO pSignerInfo, SYSTEMTIME* st)
 {
     BOOL fResult;
@@ -181,7 +216,9 @@ BOOL Authenticode::GetDateOfTimeStamp(PCMSG_SIGNER_INFO pSignerInfo, SYSTEMTIME*
                 &dwData);
             if (!fResult)
             {
+#ifdef LOGGING_ENABLED
                 Logger::logf(Err, "CryptDecodeObject failed with %x @ Authenticode::GetTimeStampSignerInfo", GetLastError());
+#endif
                 break;
             }
 
@@ -198,10 +235,16 @@ BOOL Authenticode::GetDateOfTimeStamp(PCMSG_SIGNER_INFO pSignerInfo, SYSTEMTIME*
     return fReturn;
 }
 
-/*
-    AllocateAndCopyWideString - helper routine used by several certificate routines in this file (this code was part of Microsoft's example, so it's packaged into the same file for consistency)
-    returns a wide string which must be manually freed by the caller
-*/
+/**
+ * @brief Copies a wide string to a newly allocated memory block
+ *
+ * @param inputString String to be copied
+ *
+ * @return LPWSTR, or NULL if allocation failed
+ *
+ * @usage
+ * LPWSTR pCopyStr = Authenticode::AllocateAndCopyWideString(L"Hello, World!");
+ */
 LPWSTR Authenticode::AllocateAndCopyWideString(LPCWSTR inputString) //used in other routines found in NAuthenticode.cpp
 {
     LPWSTR outputString = NULL;
@@ -214,10 +257,17 @@ LPWSTR Authenticode::AllocateAndCopyWideString(LPCWSTR inputString) //used in ot
     return outputString;
 }
 
-/*
-    GetProgAndPublisherInfo - checks the subject & publisher information of a certificate
-    returns `TRUE` on success, and fills the `Info` parameter
-*/
+/**
+ * @brief Grabs the program and publisher information from a signer info structure
+ *
+ * @param pSignerInfo Structure representing the certificate signer info
+ * @param Info Structure to fill, representing program and publisher information
+ * 
+ * @return true/false if the information was successfully retrieved
+ *
+ * @usage
+ * BOOL success = Authenticode::GetProgAndPublisherInfo(pSignerInfo, &publisherInfo);
+ */
 BOOL Authenticode::GetProgAndPublisherInfo(__in PCMSG_SIGNER_INFO pSignerInfo, __out PSPROG_PUBLISHERINFO Info)
 {
     BOOL fReturn = FALSE;
@@ -244,7 +294,9 @@ BOOL Authenticode::GetProgAndPublisherInfo(__in PCMSG_SIGNER_INFO pSignerInfo, _
                     &dwData);
                 if (!fResult)
                 {
+#ifdef LOGGING_ENABLED
                     Logger::logf(Err, "CryptDecodeObject failed with %x @ Authenticode::GetProgAndPublisherInfo", GetLastError());
+#endif
                     __leave;
                 }
 
@@ -252,7 +304,9 @@ BOOL Authenticode::GetProgAndPublisherInfo(__in PCMSG_SIGNER_INFO pSignerInfo, _
                 OpusInfo = (PSPC_SP_OPUS_INFO)LocalAlloc(LPTR, dwData);
                 if (!OpusInfo)
                 {
+#ifdef LOGGING_ENABLED
                     Logger::logf(Err, "Unable to allocate memory for publisher info @ Authenticode::GetProgAndPublisherInfo");
+#endif
                     __leave;
                 }
 
@@ -266,7 +320,9 @@ BOOL Authenticode::GetProgAndPublisherInfo(__in PCMSG_SIGNER_INFO pSignerInfo, _
                     &dwData);
                 if (!fResult)
                 {
+#ifdef LOGGING_ENABLED
                     Logger::logf(Err, "CryptDecodeObject failed with %x @ Authenticode::GetProgAndPublisherInfo", GetLastError());
+#endif
                     __leave;
                 }
 
@@ -344,9 +400,17 @@ BOOL Authenticode::GetProgAndPublisherInfo(__in PCMSG_SIGNER_INFO pSignerInfo, _
     return fReturn;
 }
 
-/*
-    GetTimeStampSignerInfo - retrieves a PCMSG_SIGNER_INFO object ( `pCounterSignerInfo`) for the input `pSignerInfo` (certificate signer info)
-    returns `TRUE` on success, and fills `pCounterSignerInfo`
+/** 
+ * @brief Retrieves the time stamp signer information from a signer info structure
+ *
+ * @param pSignerInfo Structure representing information about the cert signer
+ * @param pCounterSignerInfo Pointer to a pointer that will hold the counter signer info if found
+ *
+ * @return true/false if successfully retrieves the time stamp signer info
+ *
+ * @usage
+ * PCMSG_SIGNER_INFO pCounterSignerInfo = NULL;
+ * BOOL success = Authenticode::GetTimeStampSignerInfo(pSignerInfo, &pCounterSignerInfo);
 */
 BOOL Authenticode::GetTimeStampSignerInfo(__in PCMSG_SIGNER_INFO pSignerInfo, __out PCMSG_SIGNER_INFO* pCounterSignerInfo)
 {
@@ -376,7 +440,9 @@ BOOL Authenticode::GetTimeStampSignerInfo(__in PCMSG_SIGNER_INFO pSignerInfo, __
                     &dwSize);
                 if (!fResult)
                 {
+#ifdef LOGGING_ENABLED
                     Logger::logf(Err, "CryptDecodeObject failed with %x @ Authenticode::GetTimeStampSignerInfo", GetLastError());
+#endif
                     __leave;
                 }
 
@@ -384,7 +450,9 @@ BOOL Authenticode::GetTimeStampSignerInfo(__in PCMSG_SIGNER_INFO pSignerInfo, __
                 *pCounterSignerInfo = (PCMSG_SIGNER_INFO)LocalAlloc(LPTR, dwSize);
                 if (!*pCounterSignerInfo)
                 {
+#ifdef LOGGING_ENABLED
                     Logger::logf(Err, "Unable to allocate memory for timestamp info @ Authenticode::GetTimeStampSignerInfo");
+#endif
                     __leave;
                 }
 
@@ -399,7 +467,9 @@ BOOL Authenticode::GetTimeStampSignerInfo(__in PCMSG_SIGNER_INFO pSignerInfo, __
                     &dwSize);
                 if (!fResult)
                 {
+#ifdef LOGGING_ENABLED
                     Logger::logf(Err, "CryptDecodeObject failed with %x @ Authenticode::GetTimeStampSignerInfo", GetLastError());
+#endif
                     __leave;
                 }
 
@@ -418,9 +488,12 @@ BOOL Authenticode::GetTimeStampSignerInfo(__in PCMSG_SIGNER_INFO pSignerInfo, __
     return fReturn;
 }
 
-/*
-    GetCertificateSubject - fetches a certificate's subject (name of the entity who requested the signing) from the cert's context (`pCertContext`)
-    returns a wide string on success with size > 0
+/**
+* @brief Retrieves the subject name of a certificate context
+* @param pCertContext Pointer to the certificate context
+* @return A wide string containing the subject name, or an empty string if an error occurs
+* @usage
+* wstring subjectName = Authenticode::GetCertificateSubject(pCertContext);
 */
 wstring Authenticode::GetCertificateSubject(__in PCCERT_CONTEXT pCertContext)
 {
@@ -433,20 +506,26 @@ wstring Authenticode::GetCertificateSubject(__in PCCERT_CONTEXT pCertContext)
     // Get Issuer name size.
     if (!(dwData = CertGetNameString(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, CERT_NAME_ISSUER_FLAG, NULL, NULL, 0)))
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "CertGetNameString failed @ GetCertificateSubject");
+#endif
         goto end;
     }
 
     szName = (LPTSTR)LocalAlloc(LPTR, dwData * sizeof(TCHAR));     // Allocate memory for Issuer name.
     if (!szName) 
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "Unable to allocate memory for issuer name @ GetCertificateSubject");
+#endif
         goto end;
     }
 
     if (!(CertGetNameString(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, CERT_NAME_ISSUER_FLAG, NULL, szName, dwData)))    // Get Issuer name.
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "CertGetNameString failed @ GetCertificateSubject");
+#endif
         goto end;
     }
 
@@ -455,20 +534,26 @@ wstring Authenticode::GetCertificateSubject(__in PCCERT_CONTEXT pCertContext)
 
     if (!(dwData = CertGetNameString(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL, NULL, 0)))     // Get Subject name size.
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "CertGetNameString failed @ GetCertificateSubject");
+#endif
         goto end;
     }
 
     szName = (LPTSTR)LocalAlloc(LPTR, dwData * sizeof(TCHAR));
     if (!szName)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "Unable to allocate memory for subject name @ GetCertificateSubject");
+#endif
         goto end;
     }
 
     if (!(CertGetNameString(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL, szName, dwData)))     // Get subject name
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "CertGetNameString failed @ GetCertificateSubject");
+#endif
         goto end;
     }
 
@@ -481,9 +566,15 @@ end:
 }
 
 /*
-    GetSignerFromFile - retrieves the entity who requested a signature on `filePath`
-    returns a wide string on success with size > 0
-*/
+ * @brief Retrieves the signer information from a signed file
+ *
+ * @param filePath The path to the signed file
+ *
+ * @return A wide string containing the subject name of the signer certificate, or an empty string if an error occurs
+ *
+ * @usage
+ * wstring signer = Authenticode::GetSignerFromFile(L"myfile.exe");
+ */ 
 wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
 {
     WCHAR szFileName[MAX_PATH];
@@ -515,7 +606,9 @@ wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
         NULL);
     if (!fResult)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "CryptQueryObject failed with %x @ GetSignerFromFile", GetLastError());
+#endif
         return {};
     }
 
@@ -524,7 +617,9 @@ wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
 
     if (!fResult)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "CryptMsgGetParam failed with %x @ GetSignerFromFile", GetLastError());
+#endif
         return {};
     }
 
@@ -533,7 +628,9 @@ wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
 
     if (!pSignerInfo)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "Unable to allocate memory for Signer Info @ GetSignerFromFile");
+#endif
         return {};
     }
 
@@ -542,7 +639,9 @@ wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
 
     if (!fResult)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "CryptMsgGetParam failed with %x @ GetSignerFromFile", GetLastError());
+#endif
         return {};
     }
 
@@ -582,7 +681,9 @@ wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
         NULL);
     if (!pCertContext)
     {
+#ifdef LOGGING_ENABLED
         Logger::logf(Err, "CertFindCertificateInStore failed with %x @ GetSignerFromFile", GetLastError());
+#endif
         return {};
     }
 

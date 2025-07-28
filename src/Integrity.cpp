@@ -135,7 +135,17 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 			throw std::runtime_error("Integrity check failed: main module checksum mismatch");
 		}
 
-		uint64_t textSectionAddr = Process::GetSectionAddress(GetModuleHandle(NULL), ".text");
+		//uint64_t textSectionAddr = Process::GetSectionAddress(GetModuleHandle(NULL), ".text");
+
+		//MEMORY_BASIC_INFORMATION mbi = {};
+		//if (VirtualQuery((LPCVOID)textSectionAddr, &mbi, sizeof(MEMORY_BASIC_INFORMATION)))
+		//{
+		//	if (mbi.AllocationProtect != PAGE_EXECUTE_READ)
+		//	{
+		//		//optionally, log to a remote server
+		//		throw std::runtime_error("Integrity check failed: .text section protection mismatch");
+		//	}
+		//}
 
 		this_thread::sleep_for(std::chrono::seconds(10));
 	}
