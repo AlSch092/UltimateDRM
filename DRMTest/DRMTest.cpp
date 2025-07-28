@@ -34,7 +34,7 @@ uint64_t GetTextSectionStart(HMODULE hModule)
 
 int main()
 {
-	std::list<std::wstring> lAllowedParents = { L"steam.exe", L"explorer.exe" };
+	std::list<std::wstring> lAllowedParents = { L"steam.exe", L"explorer.exe", L"VsDebugConsole.exe", L"powershell.exe", L"cmd.exe"};
 
 	const std::string LicenseServerEndpoint = "https://example.com/api/license"; //replace with your actual license server endpoint
 	const bool bAllowOfflineUsage = true;
