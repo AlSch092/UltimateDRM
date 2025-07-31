@@ -25,11 +25,6 @@ jobs:
       run: |
        ./x64/Release/DRMTest.exe *>&1 | Tee-Object -FilePath output.log
        $exitCode = $LASTEXITCODE
-       $drmTestProcess = Get-Process -Name DRMTest
-       $parentProcessId = $drmTestProcess.Parent.Id
-       $parentProcess = Get-Process -Id $parentProcessId
-       Write-Host "DRMTest.exe Parent PID: $parentProcessId"
-       Write-Host "DRMTest.exe Parent Process Name: $($parentProcess.ProcessName)"
        Write-Host "Exit code: $exitCode"
        exit $exitCode
         
