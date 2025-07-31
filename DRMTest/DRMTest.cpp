@@ -4,6 +4,7 @@
 #include <iostream>
 #include <Windows.h>
 #include "../include/DRM.hpp"
+#include "../include/DRMException.hpp"
 
 #ifdef _DEBUG
 #pragma comment(lib, "../x64/Debug/UltimateDRM-d.lib")
@@ -60,6 +61,11 @@ int main()
 	{
 		std::cerr << "Error during DRM protection: " << ex.what() << std::endl;
 		return 2;
+	}
+	catch (const DRMException& ex)
+	{
+		std::cerr << "DRM Exception occurred: " << ex.what() << std::endl;
+		return 3;
 	}
 
 #ifndef _DEBUG
