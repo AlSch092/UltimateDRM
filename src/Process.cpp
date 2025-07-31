@@ -152,8 +152,8 @@ DWORD Process::GetParentProcessId()
 {
     DWORD ppid = 0;
     DWORD pid = GetCurrentProcessId();
-
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+
     if (hSnapshot == INVALID_HANDLE_VALUE)
         return 0;
 

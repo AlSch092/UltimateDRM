@@ -17,7 +17,6 @@ struct HttpRequest
 	string body;
     vector<string> responseHeaders;
     string responseText;
-
 };
 
 struct MemoryStruct

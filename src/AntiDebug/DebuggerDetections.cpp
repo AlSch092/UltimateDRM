@@ -141,10 +141,6 @@ bool DebuggerDetections::_IsDebuggerPresent_DbgBreak()
 		return false;
 	}
 
-#ifdef LOGGING_ENABLED
-	Logger::logf(Info, "Calling __fastfail() to prevent further execution since a debugger was found running.");
-#endif
-
 	this->AddFlagged(DebuggerMethod::DEBUG_DBG_BREAK);
 	return true;
 #endif

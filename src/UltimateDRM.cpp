@@ -114,9 +114,9 @@ struct DRM::Impl
 				throw std::runtime_error("Could not initialize AntiDebugger: " + std::string(ex.what()));
 			}
 		}
-
-	}
 #endif
+	}
+
 	~Impl() 
 	{
 		 this->ProtectedSettings->Reset();
@@ -198,6 +198,9 @@ bool DRM::Protect()
 			{
 				if (!Authenticode::HasSignature(std::wstring(parentProcDirectory + parentProcName).c_str(), TRUE))
 				{
+#ifdef LOGGING_ENABLED
+					Logger::logf(Err, "Parent process lacks a valid code signature!");
+#endif
 					throw DRMException(DRMException::CodeSigningFailed);
 				}
 				else
@@ -230,14 +233,21 @@ bool DRM::Protect()
 			throw std::runtime_error("Failed to remap program sections");
 		}
 #endif
-		uint64_t moduleChecksum = Integrity::CalculateChecksum(GetModuleHandle(NULL));
+		uint64_t moduleTextChecksum = Integrity::CalculateChecksumFromSection(GetModuleHandle(NULL), ".text");
+		uint64_t moduleRDataChecksum = Integrity::CalculateChecksumFromSection(GetModuleHandle(NULL), ".rdata");
 
-		if (moduleChecksum == 0)
+		if (moduleTextChecksum == 0 || moduleRDataChecksum == 0)
 		{
-			throw std::runtime_error("Failed to calculate module checksum");
+			throw std::runtime_error("Failed to calculate module's checksums");
 		}
 
-		this->pImpl->IntegrityChecker->StoreModuleChecksum(GetModuleHandle(NULL), moduleChecksum); //tested and working fine
+		ModuleChecksumData moduleChecksum;
+		moduleChecksum.hMod = GetModuleHandle(NULL);
+		moduleChecksum.Name = Process::GetProcessName(GetCurrentProcessId());
+		moduleChecksum.SectionChecksums[".text"] = moduleTextChecksum;
+		moduleChecksum.SectionChecksums[".rdata"] = moduleRDataChecksum;
+
+		this->pImpl->IntegrityChecker->StoreModuleChecksum(moduleChecksum); //tested and working fine
 	}
 
 	if (Settings::Instance->bRequireCodeSigning)
@@ -462,7 +472,7 @@ LONG WINAPI g_VectoredExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo)
 	DWORD exceptionCode = ExceptionInfo->ExceptionRecord->ExceptionCode;
 
 #ifdef LOGGING_ENABLED
-	Logger::logf(Err, "Vectored Exception Handler called with exception code : 0x % 08X\n", exceptionCode);
+	Logger::logf(Err, "Vectored Exception Handler called with exception code : 0x%08X\n", exceptionCode);
 #endif
 	return EXCEPTION_CONTINUE_SEARCH;
 }
