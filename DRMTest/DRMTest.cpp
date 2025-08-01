@@ -12,7 +12,7 @@
 #pragma comment(lib, "../x64/Release/UltimateDRM.lib")
 #endif
 
-uint64_t GetTextSectionStart(HMODULE hModule)
+uint64_t GetSectionStart(HMODULE hModule, const char* sectionName)
 {
 	if (!hModule) 
 		return 0;
@@ -24,7 +24,7 @@ uint64_t GetTextSectionStart(HMODULE hModule)
 
 	for (WORD i = 0; i < ntHeaders->FileHeader.NumberOfSections; ++i, ++section)
 	{
-		if (strncmp((char*)section->Name, ".text", 5) == 0)
+		if (strcmp((char*)section->Name, sectionName) == 0)
 		{
 			return (uint64_t)(base + section->VirtualAddress);
 		}
@@ -33,7 +33,7 @@ uint64_t GetTextSectionStart(HMODULE hModule)
 	return 0;
 }
 
-int main()
+int main(int argc, char** argv)
 {
 	std::list<std::wstring> lAllowedParents = { L"steam.exe", L"explorer.exe", L"VsDebugConsole.exe", L"powershell.exe", L"pwsh.exe", L"cmd.exe"};
 
@@ -70,7 +70,7 @@ int main()
 
 #ifndef _DEBUG
 	//TEST: Check if sections page protections can be changed after remap
-	uint64_t textSectionStart = GetTextSectionStart(GetModuleHandleA(NULL)); 
+	uint64_t textSectionStart = GetSectionStart(GetModuleHandleA(NULL), ".text");
 
 	if (textSectionStart == 0)
 	{
