@@ -117,6 +117,9 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 {
 	if (classThisPtr == nullptr)
 	{
+#ifdef LOGGING_ENABLED
+		Logger::logfw(Err, L"PeriodicIntegrityCheck called with null class Ptr");
+#endif
 		throw std::runtime_error("PeriodicIntegrityCheck called with null class Ptr");
 	}
 
@@ -135,7 +138,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 		if (counter % 2 == 0)
 		{
 		    checksum_main = Integrity::CalculateChecksumFromSection(GetModuleHandle(NULL), ".text");
-		    prev_checksum = integrity->RetrieveModuleChecksum(GetModuleHandle(NULL), ".text");
+		    prev_checksum = integrity->RetrieveModuleChecksum(GetModuleHandle(NULL), ".text"); //fetch checksum gathered at program startup
 		}
 		else
 		{
@@ -146,19 +149,39 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 		if (checksum_main != prev_checksum && prev_checksum != 0)
 		{
 			//optionally, log to a remote server
+#ifdef LOGGING_ENABLED
+			Logger::logfw(Detection, L"Checksum for %s is different, tampering detected", (counter % 2 == 0 ? L".text" : L".rdata"));
+#endif
 			throw std::runtime_error("Integrity check failed: main module checksum mismatch");
 		}
 
+		std::wstring fullProcessPath = Services::GetProcessDirectoryW(GetCurrentProcessId());
+		fullProcessPath += Process::GetProcessName(GetCurrentProcessId());
+
+		uint64_t diskFileChecksum = GetSectionChecksumFromDisc(fullProcessPath, (counter % 2 == 0 ? ".text" : ".rdata"));
+
+		if (diskFileChecksum != prev_checksum)
+		{
+#ifdef LOGGING_ENABLED
+			Logger::logfw(Detection, L"Checksum for %s on disk is different, tampering detected", (counter % 2 == 0 ? L".text" : L".rdata"));
+#endif
+			throw std::runtime_error("Integrity check failed: disk file checksum mismatch");
+		}
+
+
 #ifndef _DEBUG
-		uint64_t textSectionAddr = Process::GetSectionAddress(GetModuleHandle(NULL), ".text");
+		uint64_t textSectionAddr = Process::GetSectionAddress(GetModuleHandle(NULL), ".text"); //todo: change this to check all pages in .text
 
 		MEMORY_BASIC_INFORMATION mbi = {};
 		if (VirtualQuery((LPCVOID)textSectionAddr, &mbi, sizeof(MEMORY_BASIC_INFORMATION)))
 		{
 			if (mbi.AllocationProtect != PAGE_EXECUTE_READ)
 			{
+#ifdef LOGGING_ENABLED
+				Logger::logfw(Detection, L".text page was writable");
+#endif
 				//optionally, log to a remote server
-				throw std::runtime_error("Integrity check failed: .text section protection mismatch");
+				//throw std::runtime_error("Integrity check failed: .text page protection mismatch");
 			}
 		}
 #endif
@@ -182,7 +205,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
  */
 uint64_t Integrity::GetSectionChecksumFromDisc(__in const std::wstring path, __in const char* sectionName)
 {
-	vector<uint8_t> sectionBytes;
+	std::vector<uint8_t> sectionBytes;
 
 	std::ifstream file(path, std::ios::binary);
 	if (!file)
@@ -280,55 +303,28 @@ uint64_t Integrity::GetSectionChecksumFromDisc(__in const std::wstring path, __i
  */
  uint64_t Integrity::CalculateChecksumFromSection(HMODULE hMod, const char* sectionName)
 {
-	if (hMod == NULL)
+	if (hMod == NULL || sectionName == nullptr)
 		return 0;
 
 	uint64_t checksum = 0;
 
-	PIMAGE_DOS_HEADER pDoH = (PIMAGE_DOS_HEADER)(hMod);
-	PIMAGE_NT_HEADERS64 pNtH;
-
-	if (pDoH == NULL)
+	auto SectionList = Process::GetSections(Utility::ConvertWStringToString(Process::GetProcessName(GetCurrentProcessId())));
+	
+	for (auto section : SectionList)
 	{
-#ifdef LOGGING_ENABLED
-		Logger::logf(Err, " PIMAGE_DOS_HEADER was NULL at Integrity::CalculateChecksumFromSection\n");
-#endif
-		return 0;
-	}
-
-	pNtH = (PIMAGE_NT_HEADERS64)((PIMAGE_NT_HEADERS64)((PBYTE)hMod + (DWORD)pDoH->e_lfanew));
-
-	if (pNtH == NULL)
-	{
-#ifdef LOGGING_ENABLED
-		Logger::logf(Err, " PIMAGE_NT_HEADERS64 was NULL at Integrity::CalculateChecksumFromSection\n");
-#endif
-		return 0;
-	}
-
-	PIMAGE_SECTION_HEADER sectionHeader = IMAGE_FIRST_SECTION(pNtH);
-
-	int nSections = pNtH->FileHeader.NumberOfSections;
-
-	for (int i = 0; i < nSections; i++)
-	{
-		std::string section(reinterpret_cast<const char*>(sectionHeader[i].Name));
-
-		if (section == std::string(sectionName))
+		if (section.name == std::string(sectionName))
 		{
-			if (sectionHeader[i].SizeOfRawData > 0)
+			if (section.size > 0)
 			{
 				uint64_t sectionChecksum = 0;
 
-				for (DWORD j = 0; j < sectionHeader[i].Misc.VirtualSize; j++)
-				{
-					sectionChecksum += (uint8_t)(hMod + sectionHeader[i].VirtualAddress + j);
-				}
+				uint64_t sectionAddr = (uint64_t)(section.address) + (uint64_t)hMod;
 
-				checksum = sectionChecksum;
-			}
-
-			break;
+				for (DWORD j = 0; j < section.size; j++)				
+					checksum += *(uint8_t*)(sectionAddr + j);
+				
+				break;
+			}	
 		}
 	}
 

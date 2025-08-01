@@ -91,9 +91,9 @@ bool Process::HasExportedFunction(__in const string dllName, __in const  string 
     GetSections - gathers a list of ProcessData::Section* from the current process
     returns list<ProcessData::Section*>*, and an empty list if the routine fails
 */
-list<ProcessData::Section*> Process::GetSections(__in const string module)
+std::list<ProcessData::Section> Process::GetSections(__in const string module)
 {
-    list<ProcessData::Section*> Sections;
+    std::list<ProcessData::Section> Sections;
 
     PIMAGE_SECTION_HEADER sectionHeader;
     HMODULE hInst = NULL;  
@@ -122,21 +122,21 @@ list<ProcessData::Section*> Process::GetSections(__in const string module)
 
     for (int i = 0; i < nSections; i++)
     {
-        ProcessData::Section* s = new ProcessData::Section();
+        ProcessData::Section s;
 
-        s->address = sectionHeader[i].VirtualAddress;
+        s.address = sectionHeader[i].VirtualAddress;
 
-        s->name = std::string(reinterpret_cast<const char*>(sectionHeader[i].Name));
+        s.name = std::string(reinterpret_cast<const char*>(sectionHeader[i].Name));
       
-        if (s->name.size() > 8)
-            s->name.resize(8, 0);
+        if (s.name.size() > 8)
+            s.name.resize(8, 0);
 
-        s->Misc.VirtualSize = sectionHeader[i].Misc.VirtualSize;
-        s->size = s->Misc.VirtualSize;
-        s->PointerToRawData = sectionHeader[i].PointerToRawData;
-        s->PointerToRelocations = sectionHeader[i].PointerToRelocations;
-        s->NumberOfLinenumbers = sectionHeader[i].NumberOfLinenumbers;
-        s->PointerToLinenumbers = sectionHeader[i].PointerToLinenumbers;
+        s.Misc.VirtualSize = sectionHeader[i].Misc.VirtualSize;
+        s.size = s.Misc.VirtualSize;
+        s.PointerToRawData = sectionHeader[i].PointerToRawData;
+        s.PointerToRelocations = sectionHeader[i].PointerToRelocations;
+        s.NumberOfLinenumbers = sectionHeader[i].NumberOfLinenumbers;
+        s.PointerToLinenumbers = sectionHeader[i].PointerToLinenumbers;
 
         Sections.push_back(s);
     }

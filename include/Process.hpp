@@ -111,7 +111,7 @@ public:
 
 	bool FillModuleList();
 
-	static list<ProcessData::Section*> GetSections(__in const string module);
+	static list<ProcessData::Section> GetSections(__in const string module);
 
 #ifdef _M_IX86
 	static _MYPEB* GetPEB() { return (_MYPEB*)__readfsdword(0x30); }

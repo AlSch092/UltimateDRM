@@ -228,10 +228,10 @@ bool DRM::Protect()
 	if (Settings::Instance->bCheckIntegrity)
 	{
 #ifndef _DEBUG
-		if (!RmpRemapImage((ULONG_PTR)GetModuleHandle(NULL))) //possibly  causes Defender false positive? Debug compilation does not throw false positive, where this is excluded
-		{
-			throw std::runtime_error("Failed to remap program sections");
-		}
+		//if (!RmpRemapImage((ULONG_PTR)GetModuleHandle(NULL))) //possibly  causes Defender false positive? Debug compilation does not throw false positive, where this is excluded
+		//{
+		//	throw std::runtime_error("Failed to remap program sections");
+		//}
 #endif
 		uint64_t moduleTextChecksum = Integrity::CalculateChecksumFromSection(GetModuleHandle(NULL), ".text");
 		uint64_t moduleRDataChecksum = Integrity::CalculateChecksumFromSection(GetModuleHandle(NULL), ".rdata");
