@@ -56,6 +56,8 @@ public:
 	Integrity operator*(Integrity& other) = delete;
 	Integrity operator/(Integrity& other) = delete;
 
+	static uint64_t FindWritableAddress(__in const std::string moduleName, __in const std::string sectionName);
+
 	//static const uint64_t CalculateChecksum(HMODULE hMod);
 	static uint64_t CalculateChecksumFromSection(HMODULE hMod, const char* sectionName);
 

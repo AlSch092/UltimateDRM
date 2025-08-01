@@ -130,6 +130,8 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 	bool checking = true;
 	int counter = 0;
 
+	std::string processName = Utility::ConvertWStringToString(Process::GetProcessName(GetCurrentProcessId()));
+
 	while (checking)
 	{
 		uint64_t checksum_main = 0;
@@ -168,22 +170,18 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 			throw std::runtime_error("Integrity check failed: disk file checksum mismatch");
 		}
 
-
 #ifndef _DEBUG
-		uint64_t textSectionAddr = Process::GetSectionAddress(GetModuleHandle(NULL), ".text"); //todo: change this to check all pages in .text
+		uint64_t writablePageInText = FindWritableAddress(processName, ".text");
+		uint64_t writablePageInRData = FindWritableAddress(processName, ".rdata");
 
-		MEMORY_BASIC_INFORMATION mbi = {};
-		if (VirtualQuery((LPCVOID)textSectionAddr, &mbi, sizeof(MEMORY_BASIC_INFORMATION)))
+		if (writablePageInText != 0 || writablePageInRData != 0)
 		{
-			if (mbi.AllocationProtect != PAGE_EXECUTE_READ)
-			{
 #ifdef LOGGING_ENABLED
-				Logger::logfw(Detection, L".text page was writable");
+			Logger::logfw(Detection, L".text or .rdata section had writable page - someone has remapped sections!");
 #endif
-				//optionally, log to a remote server
-				//throw std::runtime_error("Integrity check failed: .text page protection mismatch");
-			}
-		}
+			//optionally, log to a remote server
+			throw std::runtime_error("Integrity check failed: .text page protection mismatch");
+		}	
 #endif
 
 		this_thread::sleep_for(std::chrono::seconds(10));
@@ -254,7 +252,7 @@ uint64_t Integrity::GetSectionChecksumFromDisc(__in const std::wstring path, __i
 	if (!found)
 	{
 #ifdef LOGGING_ENABLED
-		Logger::logfw(Detection, L".text section not found in file: %s @ GetSectionHashFromDisc", path.c_str());
+		Logger::logfw(Detection, L"section not found in file: %s @ GetSectionHashFromDisc", path.c_str());
 #endif
 		return 0;
 	}
@@ -357,4 +355,69 @@ bool Integrity::CheckLoadedModuleHashVersusDiskHash(__in const HMODULE hMod, __i
 	uint64_t loadedModuleSectionChecksum = CalculateChecksumFromSection(hMod, sectionName);
 
 	return (diskFileSectionChecksum == loadedModuleSectionChecksum);
+}
+
+/**
+ * @brief Finds a writable address in a specific section of a module
+ *
+ * This function searches for a writable address in the specified section of a module.
+ *
+ * @param moduleName The name of the module to search in
+ * @param sectionName The name of the section to search in
+ *
+ * @return The address of the writable section, or 0 if not found
+ *
+ * @details N/A
+ *
+ * @usage
+ * uint64_t writableAddress = Integrity::FindWritableAddress("myModule.dll", ".rdata");
+ */
+uint64_t Integrity::FindWritableAddress(__in const std::string moduleName, __in const std::string sectionName)
+{
+	if (moduleName.empty() || sectionName.empty())
+	{
+		return 0;
+	}
+
+	HMODULE hMod = GetModuleHandleA(moduleName.c_str());
+
+	if (hMod == NULL)
+	{
+#ifdef LOGGING_ENABLED
+		Logger::logfw(Err, L"Failed to get module handle for %s @ Integrity::FindWritableAddress", moduleName.c_str());
+#endif
+		return 0;
+	}
+
+	const uint64_t sectionAddr = Process::GetSectionAddress(hMod, sectionName.c_str());
+	MEMORY_BASIC_INFORMATION mbi = { 0 };
+	SIZE_T result = 0;
+	uint64_t currentPageAddress = sectionAddr;
+
+	const int pageSize = 0x1000;
+
+	if (sectionAddr == NULL)
+	{
+#ifdef LOGGING_ENABLED
+		Logger::logf(Err, "textAddr was NULL @ Integrity::FindWritableAddress");
+#endif
+		return 0;
+	}
+
+	uint64_t max_addr = sectionAddr + Process::GetSectionSize(hMod, sectionName);
+
+	while ((result = VirtualQuery((LPCVOID)currentPageAddress, &mbi, sizeof(mbi))) != 0)     //Loop through all pages in .text
+	{
+		if (currentPageAddress >= max_addr)
+			break;
+
+		if (mbi.Protect != PAGE_EXECUTE_READ) //check if its not RX protections
+		{
+			return currentPageAddress;
+		}
+
+		currentPageAddress += pageSize;
+	}
+
+	return 0;
 }

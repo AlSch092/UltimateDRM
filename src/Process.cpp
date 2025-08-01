@@ -725,8 +725,16 @@ HMODULE Process::GetModuleHandle_Ldr(__in const  wchar_t* moduleName)
     return (HMODULE)NULL;
 }
 
-DWORD Process::GetTextSectionSize(__in const HMODULE hModule)
+DWORD Process::GetSectionSize(__in const HMODULE hModule, __in const std::string section)
 {
+    if (hModule == NULL || section.empty())
+    {
+#ifdef LOGGING_ENABLED
+        Logger::logf(Err, "Invalid parameter @ GetTextSectionSize");
+#endif
+        return 0;
+    }
+
     PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)hModule;
     if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE)
     {
@@ -749,13 +757,13 @@ DWORD Process::GetTextSectionSize(__in const HMODULE hModule)
 
     for (int i = 0; i < ntHeaders->FileHeader.NumberOfSections; i++)
     {
-        if (strcmp((char*)sectionHeaders[i].Name, ".text") == 0)
+        if (strcmp((char*)sectionHeaders[i].Name, section.c_str()) == 0)
         {
             return sectionHeaders[i].Misc.VirtualSize;
         }
     }
 
-    return 0; //failure case, could not find .text section
+    return 0; //failure case, could not find section?
 }
 
 /*
