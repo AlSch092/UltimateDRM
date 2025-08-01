@@ -1,5 +1,6 @@
 # Changelog - UltimateDRM
 
+- Aug 1 2025:   Added checks for if pages are writable in .text, .rdata  
 - July 31 2025: Fixed checksum integrity checks, added disk check to periodic checks, all working now  
 - July 30 2025: Improved integrity checker code, added checks for multiple sections, added routine for checking file on disc  
 - July 25 2025: Add hypervisor checks, add DRMExceptions class, clean up Process class  
