@@ -4,15 +4,22 @@
 #include <iostream>
 #include <Windows.h>
 #include "../include/DRM.hpp"
-#include "../include/DRMException.hpp"
 
+#ifdef _M_X64
 #ifdef _DEBUG
-#pragma comment(lib, "../x64/Debug/UltimateDRM-d.lib")
+#pragma comment(lib, "../x64/Debug/UltimateDRM.libUltimateDRM-d.lib")
 #else
 #pragma comment(lib, "../x64/Release/UltimateDRM.lib")
 #endif
+#else
+#ifdef _RELEASE
+#pragma comment(lib, "../Debug/UltimateDRM.libUltimateDRM-d.lib")
+#else
+#pragma comment(lib, "../Release/UltimateDRM.lib")
+#endif
+#endif
 
-uint64_t GetSectionStart(HMODULE hModule, const char* sectionName)
+uintptr_t GetSectionStart(HMODULE hModule, const char* sectionName)
 {
 	if (!hModule) 
 		return 0;
@@ -26,7 +33,7 @@ uint64_t GetSectionStart(HMODULE hModule, const char* sectionName)
 	{
 		if (strcmp((char*)section->Name, sectionName) == 0)
 		{
-			return (uint64_t)(base + section->VirtualAddress);
+			return (uintptr_t)(base + section->VirtualAddress);
 		}
 	}
 
@@ -70,7 +77,7 @@ int main(int argc, char** argv)
 
 #ifndef _DEBUG
 	//TEST: Check if sections page protections can be changed after remap
-	uint64_t textSectionStart = GetSectionStart(GetModuleHandleA(NULL), ".text");
+	uintptr_t textSectionStart = GetSectionStart(GetModuleHandleA(NULL), ".text");
 
 	if (textSectionStart == 0)
 	{
@@ -79,8 +86,6 @@ int main(int argc, char** argv)
 	}
 
 	DWORD dwOldProt = 0;
-
-	printf("textSectionStart at: %llX\n", textSectionStart);
 
 	if (VirtualProtect((LPVOID)textSectionStart, 0x1000, PAGE_EXECUTE_READWRITE, &dwOldProt))
 	{
@@ -92,6 +97,8 @@ int main(int argc, char** argv)
 		std::cout << "Failed to make text section writable: test passed\n";
 	}
 #endif
+
+	Sleep(100000);
 
 	delete drm;
 
