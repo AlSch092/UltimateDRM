@@ -290,7 +290,7 @@ uintptr_t Process::GetSectionAddress(__in const HMODULE hModule, __in const  cha
     GetBytesAtAddress - return bytes from an address given `size`.
     returns a BYTE array filled with values from `address` for `size` number of bytes
 */
-BYTE* Process::GetBytesAtAddress(__in const uintptr_t address, __in const  UINT size) //remember to free bytes if not NULL ret
+BYTE* Process::GetBytesAtAddress(__in const uintptr_t address, __in const UINT size) //remember to free bytes if not NULL ret
 {
     BYTE* memBytes = new BYTE[size];
 

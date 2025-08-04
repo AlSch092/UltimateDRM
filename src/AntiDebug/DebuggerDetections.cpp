@@ -158,7 +158,7 @@ bool DebuggerDetections::_IsDebuggerPresent_VEH()
 
 	if (veh_debugger != NULL)
 	{
-		UINT64 veh_addr = (UINT64)GetProcAddress(veh_debugger, "InitializeVEH"); //check for named exports of cheat engine's VEH debugger
+		uintptr_t veh_addr = (uintptr_t)GetProcAddress(veh_debugger, "InitializeVEH"); //check for named exports of cheat engine's VEH debugger
 
 		if (veh_addr > 0)
 		{
@@ -305,7 +305,7 @@ bool DebuggerDetections::_ExitCommonDebuggers()
 		
 		for (auto pid: pids)
 		{
-			UINT64 K32Base = (UINT64)GetModuleHandleW(L"kernel32.dll");
+			uintptr_t K32Base = (uintptr_t)GetModuleHandleW(L"kernel32.dll");
 
 			if (K32Base == NULL)
 			{
@@ -315,7 +315,7 @@ bool DebuggerDetections::_ExitCommonDebuggers()
 				return false;
 			}
 
-			UINT64 ExitProcessAddr = (UINT64)GetProcAddress((HMODULE)K32Base, "ExitProcess");
+			uintptr_t ExitProcessAddr = (uintptr_t)GetProcAddress((HMODULE)K32Base, "ExitProcess");
 
 			if (ExitProcessAddr == NULL)
 			{
@@ -325,7 +325,7 @@ bool DebuggerDetections::_ExitCommonDebuggers()
 				return false;
 			}
 
-			UINT64 ExitProcessOffset = ExitProcessAddr - K32Base;
+			uintptr_t ExitProcessOffset = ExitProcessAddr - K32Base;
 
 			HANDLE remoteProcHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
 

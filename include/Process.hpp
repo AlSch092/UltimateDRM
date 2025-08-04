@@ -45,7 +45,7 @@ namespace ProcessData
 	{
 		string name = "";
 		unsigned int size;
-		UINT64 address;
+		uintptr_t address;
 
 		union 
 		{
@@ -53,10 +53,10 @@ namespace ProcessData
 			DWORD   VirtualSize;
 		} Misc;
 
-		UINT64 PointerToRawData;
-		UINT64 PointerToRelocations;
+		uintptr_t PointerToRawData;
+		uintptr_t PointerToRelocations;
 		DWORD NumberOfLinenumbers;
-		UINT64 PointerToLinenumbers;
+		uintptr_t PointerToLinenumbers;
 	};
 
 	struct ImportFunction
@@ -64,7 +64,7 @@ namespace ProcessData
 		HMODULE Module;
 		std::string AssociatedModuleName;
 		std::string FunctionName;
-		UINT64 AddressOfData;
+		uintptr_t AddressOfData;
 	};
 }
 
@@ -136,15 +136,15 @@ public:
 
 	static FARPROC _GetProcAddress(__in const PCSTR Module, __in const  LPCSTR lpProcName); //GetProcAddress without winAPI call
 
-	static UINT64 GetSectionAddress(__in const HMODULE hMod, __in const  char* sectionName);
+	static uintptr_t GetSectionAddress(__in const HMODULE hMod, __in const  char* sectionName);
 
-	static BYTE* GetBytesAtAddress(__in const UINT64 address, __in const UINT size);
+	static BYTE* GetBytesAtAddress(__in const uintptr_t address, __in const UINT size);
 
 	static DWORD GetModuleSize(__in const HMODULE module);
 
 	static list<ProcessData::ImportFunction*> GetIATEntries(); //start of IAT hook checks
 
-	static bool IsReturnAddressInModule(__in const UINT64 RetAddr, __in const  wchar_t* module);
+	static bool IsReturnAddressInModule(__in const uintptr_t RetAddr, __in const  wchar_t* module);
 
 	static std::vector<ProcessData::MODULE_DATA> GetLoadedModules();
 	static ProcessData::MODULE_DATA* GetModuleInfo(__in const  wchar_t* name);
@@ -156,7 +156,7 @@ public:
 	static HMODULE GetRemoteModuleBaseAddress(__in const DWORD processId, __in const  wchar_t* moduleName);
 
 	static bool GetProcessTextSection(__in const HANDLE hProcess, __out uintptr_t& baseAddress, __out SIZE_T& sectionSize);
-	static std::vector<BYTE> ReadRemoteTextSection(__in const DWORD pid); //fetch .text of a running process (can improve this by making it any section instead of just .text)
+	static std::vector<uint8_t> ReadRemoteTextSection(__in const DWORD pid); //fetch .text of a running process (can improve this by making it any section instead of just .text)
 
 private:
 

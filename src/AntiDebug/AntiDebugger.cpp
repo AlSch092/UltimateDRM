@@ -201,8 +201,8 @@ bool Debugger::AntiDebug::PreventWindowsDebuggers()
 
 	DWORD dwOldProt = 0;
 
-	UINT64 DbgBreakpoint_Address = (UINT64)GetProcAddress(ntdll, "DbgBreakPoint");
-	UINT64 DbgUiRemoteBreakin_Address = (UINT64)GetProcAddress(ntdll, "DbgUiRemoteBreakin");
+	uintptr_t DbgBreakpoint_Address = (uintptr_t)GetProcAddress(ntdll, "DbgBreakPoint");
+	uintptr_t DbgUiRemoteBreakin_Address = (uintptr_t)GetProcAddress(ntdll, "DbgUiRemoteBreakin");
 
 	if (DbgBreakpoint_Address)
 	{
