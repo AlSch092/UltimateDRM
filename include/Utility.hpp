@@ -20,8 +20,8 @@ class Utility final
 {
 public:
 	
-	static bool strcmp_insensitive(__in const char* s1, __in const char* s2);
-	static bool wcscmp_insensitive(__in const wchar_t* s1, __in const wchar_t* s2);
+	static bool strcmp_insensitive(__in const char* s1, __in const char* s2); //C Style compare
+	static bool wcscmp_insensitive(__in const wchar_t* s1, __in const wchar_t* s2); //C Style compare
 
 	static string GenerateRandomString(__in const int length);
 	static wstring GenerateRandomWString(__in const int length);
@@ -39,4 +39,6 @@ public:
 
 	static wstring ToLower(__in const std::wstring& str);
 	static bool ContainsWStringInsensitive(__in const std::wstring& haystack, __in const std::wstring& needle);
+
+	static std::wstring NtPathToDosPath(const std::wstring& ntPath);
 };

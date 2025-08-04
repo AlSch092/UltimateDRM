@@ -61,6 +61,8 @@ public:
 	static uintptr_t CalculateChecksumFromSection(const std::string module, const char* sectionName);
 
 	static bool CompareChecksum(__in const std::string module, __in const char* section, __in const uintptr_t previous_checksum);
+	static bool CompareChecksumToFileOnDisc(__in const std::string module, __in const char* section, __in const uintptr_t previous_checksum);
+
 	static uintptr_t GetSectionChecksumFromDisc(__in const std::wstring path, __in const char* sectionName);
 
 	bool CheckLoadedModuleHashVersusDiskHash(__in const std::string module, __in const char* sectionName, __in std::wstring diskFilePath);

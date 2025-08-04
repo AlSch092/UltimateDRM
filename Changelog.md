@@ -1,5 +1,5 @@
 # Changelog - UltimateDRM
-
+- Aug 3 2025:  Added x86 support, integrity checks on all loaded modules  
 - Aug 1 2025:   Added checks for if pages are writable in .text, .rdata  
 - July 31 2025: Fixed checksum integrity checks, added disk check to periodic checks, all working now  
 - July 30 2025: Improved integrity checker code, added checks for multiple sections, added routine for checking file on disc  

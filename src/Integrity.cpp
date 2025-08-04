@@ -2,13 +2,14 @@
 #include "../include/Integrity.hpp"
 
 /**
- * @brief Calculates the checksum of the .text and .rdata sections of a module
+ * @brief Calculates the checksum of a section of a module
  *
  * This function computes the checksum of a given
  * module, in its .text and .rdata sections
  *
- * @param hMod The module's base/start address in memory
- * @param checksum Previous computed checksum of hMod
+ * @param `hMod` The module's base/start address in memory
+ * @param `section` Section to create checksum from
+ * @param `checksum` Previous computed checksum of hMod
  * 
  * @return true/false if newly computed checksum equals `checksum` param
  *
@@ -17,12 +18,41 @@
  *  @example DRM.cpp
  *
  * @usage
- * bool isModified = Integrity::CompareChecksum(GetModuleHandleA(NULL), previous_checksum);
+ * bool isModified = Integrity::CompareChecksum("DRMTest.exe", ".text", 12345678);
  */
 bool Integrity::CompareChecksum(__in const std::string module, __in const char* section, __in const uintptr_t checksum)
 {
 	return (CalculateChecksumFromSection(module, section) == checksum);
 }
+
+/**
+ * @brief Calculates the checksum of `module` disc file, compares it to `loadedImageChecksum`
+ *
+ * @details Used to check if file on disc matches its loaded image
+ * 
+ * @param `hMod` The module's base/start address in memory
+ * @param `section` Section to create checksum from
+ * @param `loadedImageChecksum` Previous computed checksum of hMod
+ *
+ * @return true/false if newly computed checksum equals `checksum` param
+ *
+ * @details If return false, the module has been modified or tampered with
+ *
+ *  @example DRM.cpp
+ *
+ * @usage
+ * bool isModified = Integrity::CompareChecksumToFileOnDisc("DRMTest.exe", ".text", 12345678);
+ */
+bool Integrity::CompareChecksumToFileOnDisc(__in const std::string module, __in const char* section, __in const uintptr_t loadedImageChecksum)
+{
+	std::wstring fullProcessPath = Services::GetProcessDirectoryW(GetCurrentProcessId());
+	fullProcessPath += Process::GetProcessName(GetCurrentProcessId());
+
+	//check checksum of module's file on disc vs. loaded image
+	uintptr_t diskFileChecksum = GetSectionChecksumFromDisc(fullProcessPath, section);
+	return (diskFileChecksum == loadedImageChecksum);
+}
+
 
 /**
  * @brief Thread routine for periodic integrity checks
@@ -72,46 +102,40 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 
 	while (checking)
 	{
-		printf("Performing integrity checks on loaded modules...\n");
-
 		uintptr_t checksum_main = 0;
 		uintptr_t prev_checksum = 0;
 
-		prev_checksum = integrity->RetrieveModuleChecksum(currentModule, (counter % 2 == 0 ? ".text" : ".rdata"));
+		prev_checksum = integrity->RetrieveModuleChecksum(currentModule, ".text");
 
-		if (!CompareChecksum(processName, (counter % 2 == 0 ? ".text" : ".rdata"), prev_checksum))
+		//check .text and read-only sections of loaded main module vs. what was gathered at startup (read-only data sections on WoW64 can change name alot per each module)
+		if (!CompareChecksum(processName, ".text", prev_checksum))
 		{
 #ifdef _LOGGING_ENABLED
-			Logger::logfw(Detection, L"Checksum for %s is different, tampering detected", (counter % 2 == 0 ? L".text" : L".rdata"));
+			Logger::logf(Detection, "Checksum for .text is different, tampering detected");
 #endif
 			throw std::runtime_error("Integrity check failed: section checksum mismatch");
 		}
 		
-		std::wstring fullProcessPath = Services::GetProcessDirectoryW(GetCurrentProcessId());
-		fullProcessPath += Process::GetProcessName(GetCurrentProcessId());
-
-		uintptr_t diskFileChecksum = GetSectionChecksumFromDisc(fullProcessPath, (counter % 2 == 0 ? ".text" : ".rdata"));
-
-		if (diskFileChecksum != prev_checksum)
+		if(!CompareChecksumToFileOnDisc(processName, ".text", CalculateChecksumFromSection(processName, ".text")))
 		{
 #ifdef _LOGGING_ENABLED
-			Logger::logfw(Detection, L"Checksum for %s on disk is different, tampering detected", (counter % 2 == 0 ? L".text" : L".rdata"));
+			Logger::logf(Detection, "Checksum for .text on disk is different, tampering detected");
 #endif
 			throw std::runtime_error("Integrity check failed: disk file checksum mismatch");
 		}
 
 #ifndef _DEBUG
-		if (FindWritableAddress(processName, ".text") != 0 || FindWritableAddress(processName, ".rdata") != 0)
+		if (FindWritableAddress(processName, ".text") != 0 || FindWritableAddress(processName, ".rdata") != 0) //check if any page is writable inside .text|.rdata
 		{
 #ifdef _LOGGING_ENABLED
-			Logger::logfw(Detection, L".text or .rdata section had writable page - someone has remapped sections!");
+			Logger::logf(Detection, ".text or .rdata section had writable page - someone has remapped sections!");
 #endif
 			//optionally, log to a remote server
-			throw std::runtime_error("Integrity check failed: .text page protection mismatch");
+			throw std::runtime_error("Integrity check failed: read-only section has writable page(s)");
 		}	
 #endif
 
-		for (const auto& mod : integrity->ModuleChecksums)
+		for (const auto& mod : integrity->ModuleChecksums) //check checksums of all loaded modules vs. what was gathered at startup
 		{
 			if (!CompareChecksum(Utility::ConvertWStringToString(mod.Name), ".text", mod.SectionChecksums.at(".text")))
 			{
@@ -120,9 +144,15 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 #endif
 				throw std::runtime_error("Integrity check failed: section checksum mismatch");
 			}
-		}
+//			else if (!CompareChecksum(Utility::ConvertWStringToString(mod.Name), (bHas_mrdata_section ? ".mrdata" : ".rdata"), mod.SectionChecksums.at((bHas_mrdata_section ? ".mrdata" : ".rdata"))))
+//			{
+//#ifdef _LOGGING_ENABLED
+//				Logger::logfw(Detection, L"Checksum for module %s at section %s is different, tampering detected", mod.Name.c_str(), L".rdata");
+//#endif
+//				throw std::runtime_error("Integrity check failed: section checksum mismatch");
+//			}
 
-		printf("Integrity checks passed: no issues found\n");
+		}
 
 		this_thread::sleep_for(std::chrono::seconds(10));
 		counter += 1;

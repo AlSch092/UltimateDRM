@@ -98,7 +98,12 @@ std::list<ProcessData::Section> Process::GetSections(__in const string module)
     PIMAGE_SECTION_HEADER sectionHeader;
     HMODULE hInst = NULL;  
     PIMAGE_DOS_HEADER pDoH;
+
+#ifdef _M_X64
     PIMAGE_NT_HEADERS64 pNtH;
+#else
+    PIMAGE_NT_HEADERS32 pNtH;
+#endif
 
     hInst= GetModuleHandleA(module.c_str());
     
@@ -111,8 +116,11 @@ std::list<ProcessData::Section> Process::GetSections(__in const string module)
 #endif
         return Sections;
     }
-
+#ifdef _M_X64
     pNtH = (PIMAGE_NT_HEADERS64)((PIMAGE_NT_HEADERS64)((PBYTE)hInst + (DWORD)pDoH->e_lfanew));
+#else
+    pNtH = (PIMAGE_NT_HEADERS32)((PIMAGE_NT_HEADERS32)((PBYTE)hInst + (DWORD)pDoH->e_lfanew));
+#endif
     sectionHeader = IMAGE_FIRST_SECTION(pNtH);
 
     int nSections = pNtH->FileHeader.NumberOfSections;
@@ -131,8 +139,13 @@ std::list<ProcessData::Section> Process::GetSections(__in const string module)
         if (s.name.size() > 8)
             s.name.resize(8, 0);
 
+        DWORD size = sectionHeader[i].SizeOfRawData; // file-backed bytes
+        
+        if (size > sectionHeader[i].Misc.VirtualSize)
+            size = sectionHeader[i].Misc.VirtualSize;
+
         s.Misc.VirtualSize = sectionHeader[i].Misc.VirtualSize;
-        s.size = s.Misc.VirtualSize;
+        s.size = size;
         s.PointerToRawData = sectionHeader[i].PointerToRawData;
         s.PointerToRelocations = sectionHeader[i].PointerToRelocations;
         s.NumberOfLinenumbers = sectionHeader[i].NumberOfLinenumbers;
@@ -553,45 +566,38 @@ bool Process::IsReturnAddressInModule(__in const uintptr_t RetAddr, __in const  
 
 /*
        GetProcessName - Returns the string name of a process with id `pid`
+       Works for both x64 and WoW64 (EnumProcessModules won't fetch from WoW64 -> 64bit process)
 */
 wstring Process::GetProcessName(__in const DWORD pid)
 {
-    std::wstring processName;
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
-    if (hProcess) 
+    typedef NTSTATUS(NTAPI* pfnNtQueryInformationProcess)(
+        HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
+
+    std::wstring result;
+
+    HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!hProc) return L"";
+
+    HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+    auto NtQueryInformationProcess =
+        (pfnNtQueryInformationProcess)GetProcAddress(hNtdll, "NtQueryInformationProcess");
+
+    ULONG size = 0;
+    NtQueryInformationProcess(hProc, ProcessImageFileName, NULL, 0, &size);
+    if (size)
     {
-        HMODULE hMod;
-        DWORD cbNeeded;
-        if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &cbNeeded)) 
-        {       
-            WCHAR processNameBuffer[MAX_PATH];
-            if (GetModuleBaseName(hProcess, hMod, processNameBuffer, sizeof(processNameBuffer) / sizeof(WCHAR))) 
-            {
-                processName = processNameBuffer;
-            }
-            else 
-            {
-#ifdef _LOGGING_ENABLED
-                Logger::logf(Err, "GetModuleBaseName failed with error %d @  Process::GetProcessName", GetLastError());
-#endif
-            }
-        }
-        else 
+        std::vector<BYTE> buffer(size);
+        if (NT_SUCCESS(NtQueryInformationProcess(hProc, ProcessImageFileName, buffer.data(), size, &size)))
         {
-#ifdef _LOGGING_ENABLED
-            Logger::logf(Err, "EnumProcessModules failed with error %d @  Process::GetProcessName", GetLastError());
-#endif
+            UNICODE_STRING* us = (UNICODE_STRING*)buffer.data();
+            result.assign(us->Buffer, us->Length / sizeof(WCHAR));
         }
-        CloseHandle(hProcess);
-    }
-    else 
-    {
-#ifdef _LOGGING_ENABLED
-        Logger::logf(Err, "OpenProcess failed with error %d @  Process::GetProcessName", GetLastError());
-#endif
     }
 
-    return processName;
+    std::wstring exeName = result.substr(result.find_last_of(L"\\") + 1);
+
+    CloseHandle(hProc);
+    return exeName;
 }
 
 /*

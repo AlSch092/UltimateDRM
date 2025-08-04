@@ -15,22 +15,26 @@
 #include "../include/AntiDebug/DebuggerDetections.hpp"
 #include "../include/DRMException.hpp"
 
-#pragma comment(linker, "/ALIGN:0x10000") //for section remapping
-#pragma comment (linker, "/INCLUDE:_tls_used")
-#pragma comment (linker, "/INCLUDE:_tls_callback")
-
 void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved);
 LONG WINAPI g_VectoredExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo);
 
 EXTERN_C
 #ifdef _M_X64
+#pragma comment(linker, "/ALIGN:0x10000") //for section remapping
+#pragma comment (linker, "/INCLUDE:_tls_used")
+#pragma comment (linker, "/INCLUDE:_tls_callback")
 #pragma const_seg (".CRT$XLB") //store tls callback inside the correct section
 const
-#endif
-
 PIMAGE_TLS_CALLBACK _tls_callback = TLSCallback;
 #pragma data_seg ()
 #pragma const_seg ()
+#endif
+
+#pragma comment(linker, "/INCLUDE:__tls_used")
+#pragma comment(linker, "/INCLUDE:_tls_callback")
+#pragma data_seg(push, old, ".CRT$XLB")
+EXTERN_C __declspec(allocate(".CRT$XLB"))  PIMAGE_TLS_CALLBACK tls_callback = TLSCallback;
+#pragma data_seg(pop, old)
 
 Settings* Settings::Instance = nullptr; //singleton static instance decl to avoid compilation errors
 
@@ -179,7 +183,6 @@ bool DRM::Protect()
 				throw DRMException(DRMException::LicenseVerificationFailed);
 			}
 		}
-
 	}
 
 	if (!Settings::Instance->allowedParents.empty()) //check parent process
@@ -242,9 +245,9 @@ bool DRM::Protect()
 		for (auto module : ModuleList) //store hashes of all loaded modules
 		{
 			uintptr_t moduleTextChecksum = Integrity::CalculateChecksumFromSection(Utility::ConvertWStringToString(module.baseName), ".text");
-			uintptr_t moduleRDataChecksum = Integrity::CalculateChecksumFromSection(Utility::ConvertWStringToString(module.baseName), ".rdata");
-
-			if (moduleTextChecksum == 0 || moduleRDataChecksum == 0)
+			//uintptr_t moduleRDataChecksum = Integrity::CalculateChecksumFromSection(Utility::ConvertWStringToString(module.baseName), (Has_mrdata_section ? ".mrdata" : ".rdata"));
+			
+			if (moduleTextChecksum == 0) //|| moduleRDataChecksum == 0)
 			{
 				throw std::runtime_error("Failed to calculate module's checksums");
 			}
@@ -253,7 +256,7 @@ bool DRM::Protect()
 			moduleChecksum.hMod = module.hModule;
 			moduleChecksum.Name = module.baseName;
 			moduleChecksum.SectionChecksums[".text"] = moduleTextChecksum;
-			moduleChecksum.SectionChecksums[".rdata"] = moduleRDataChecksum;
+			//moduleChecksum.SectionChecksums[(Has_mrdata_section ? ".mrdata" : ".rdata")] = moduleRDataChecksum;
 
 			this->pImpl->IntegrityChecker->StoreModuleChecksum(moduleChecksum); //tested and working fine
 		}		
@@ -384,29 +387,34 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 	{
 	case DLL_PROCESS_ATTACH:
 	{
-		if (bFirstProcessAttach)
+
+#ifndef _DEBUG
+		if (!Debugger::AntiDebug::HideThreadFromDebugger(GetCurrentThread())) //hide thread from debuggers, placing this in the TLS callback allows all threads to be hidden
 		{
-			bFirstProcessAttach = false;
-
-			WinVersion = Services::GetWindowsVersion();
-
-			if (WinVersion == Windows10)
-#ifdef _M_X64
-				ThreadExecutionAddressStackOffset = 0x378;
-#else
-				ThreadExecutionAddressStackOffset = 0x26C;
-#endif
-
-			SetUnhandledExceptionFilter(g_VectoredExceptionHandler);
-
-			if (!AddVectoredExceptionHandler(1, g_VectoredExceptionHandler))
-			{
 #ifdef _LOGGING_ENABLED
-				Logger::logf(Err, " Failed to register Vectored Exception Handler @ TLSCallback: %d\n", GetLastError());
+			Logger::logf(Warning, " Failed to hide thread from debugger @ TLSCallback: thread id %d\n", GetCurrentThreadId());
 #endif
-				throw std::runtime_error("Failed to register Vectored Exception Handler");
-			}
 		}
+#endif
+		WinVersion = Services::GetWindowsVersion();
+
+		if (WinVersion == Windows10) //Windows 11 no longer has the thread's start address on its stack when the tls callback is hit
+#ifdef _M_X64
+			ThreadExecutionAddressStackOffset = 0x378;
+#else
+			ThreadExecutionAddressStackOffset = 0x26C;
+#endif
+
+		SetUnhandledExceptionFilter(g_VectoredExceptionHandler);
+
+		if (!AddVectoredExceptionHandler(1, g_VectoredExceptionHandler))
+		{
+#ifdef _LOGGING_ENABLED
+			Logger::logf(Err, " Failed to register Vectored Exception Handler @ TLSCallback: %d\n", GetLastError());
+#endif
+			throw std::runtime_error("Failed to register Vectored Exception Handler");
+		}
+		
 	}break;
 
 	case DLL_PROCESS_DETACH: //program exit, clean up any memory allocated if required

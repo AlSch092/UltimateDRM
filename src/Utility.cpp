@@ -328,3 +328,32 @@ bool Utility::ContainsWStringInsensitive(__in const std::wstring& haystack, __in
     std::wstring lowerNeedle = ToLower(needle); //convert both strings to lowercase, check if the needle is in the haystack
     return lowerHaystack.find(lowerNeedle) != std::wstring::npos;
 }
+
+std::wstring Utility::NtPathToDosPath(const std::wstring& ntPath)
+{
+    if (ntPath.empty()) return L"";
+
+    WCHAR drives[512];
+    if (!GetLogicalDriveStringsW(sizeof(drives) / sizeof(WCHAR), drives))
+        return ntPath;
+
+    WCHAR deviceName[MAX_PATH];
+    WCHAR* drive = drives;
+
+    while (*drive)
+    {
+        if (QueryDosDeviceW(drive, deviceName, MAX_PATH))
+        {
+            size_t len = wcslen(deviceName);
+            if (_wcsnicmp(ntPath.c_str(), deviceName, len) == 0)
+            {
+                std::wstring dosPath = drive;
+                dosPath.pop_back(); // remove trailing '\'
+                dosPath += ntPath.substr(len);
+                return dosPath;
+            }
+        }
+        drive += wcslen(drive) + 1;
+    }
+    return ntPath;
+}
