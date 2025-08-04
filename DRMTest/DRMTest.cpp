@@ -75,6 +75,7 @@ int main(int argc, char** argv)
 		return 3;
 	}
 
+#ifdef _M_X64   //no self remapping in x86
 #ifndef _DEBUG
 	//TEST: Check if sections page protections can be changed after remap
 	uintptr_t textSectionStart = GetSectionStart(GetModuleHandleA(NULL), ".text");
@@ -97,8 +98,7 @@ int main(int argc, char** argv)
 		std::cout << "Failed to make text section writable: test passed\n";
 	}
 #endif
-
-	Sleep(100000);
+#endif
 
 	delete drm;
 
