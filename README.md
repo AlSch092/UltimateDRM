@@ -22,6 +22,8 @@ This project aims to take the good portions of the UltimateAnticheat project whi
 - Checks the parent process against a whitelist   
 - Optionally enforces code signing via Authenticode APIs  
 - Anti-debugging checks and hiding threads from debuggers   
+- Extremely low CPU & RAM usage (less than 0.1% CPU)  
+- Supports both x86 and x64  
 
 ## How to use:  
 The project is a static library (.lib) which you can include in your C++ project, along with the `DRM.hpp` header file. You can then create a `DRM` class object and call the `Protect` function. Please see `DRMTest/DRMTest.cpp` for an example of how to implement this into your own project.  
