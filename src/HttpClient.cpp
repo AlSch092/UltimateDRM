@@ -142,7 +142,7 @@ bool HttpClient::PostRequest(__inout HttpRequest& requestInfo)
 
         if (res != CURLE_OK)
         {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
             Logger::logf(Warning, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
 #endif
             goto fail_cleanup;
@@ -157,7 +157,7 @@ bool HttpClient::PostRequest(__inout HttpRequest& requestInfo)
     }
     else
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to initialize libcurl @ HttpClient::PostRequest");
 #endif
         return false;

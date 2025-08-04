@@ -25,7 +25,7 @@ BOOL Services::GetServiceModules()
 
     if (scmHandle == NULL) 
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to open Service Control Manager @ GetServiceModules: %lu\n", GetLastError());
 #endif
         return FALSE;
@@ -35,7 +35,7 @@ BOOL Services::GetServiceModules()
 
     if (!result && GetLastError() != ERROR_MORE_DATA) 
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to enumerate services @ GetServiceModules: %lu\n", GetLastError());
 #endif
         CloseServiceHandle(scmHandle);
@@ -46,7 +46,7 @@ BOOL Services::GetServiceModules()
     
     if (services == NULL) 
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Memory allocation failed @ GetServiceModules");
 #endif
         CloseServiceHandle(scmHandle);
@@ -57,7 +57,7 @@ BOOL Services::GetServiceModules()
 
     if (!result) 
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to enumerate services @ GetServiceModules: %lu\n", GetLastError());
 #endif
         free(services);
@@ -112,7 +112,7 @@ BOOL Services::GetLoadedDrivers()
 
     if (!EnumDeviceDrivers((LPVOID*)drivers, sizeof(drivers), &cbNeeded)) 
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to enumerate device drivers @ GetLoadedDrivers");
 #endif
         return FALSE;
@@ -131,7 +131,7 @@ BOOL Services::GetLoadedDrivers()
         }
         else 
         {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
             Logger::logf(Err, "Failed to get driver information @ GetLoadedDrivers : error %d\n", GetLastError());
 #endif
             return FALSE;
@@ -157,7 +157,7 @@ list<wstring> Services::GetUnsignedDrivers()
     {
         if (!GetLoadedDrivers())
         {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
             Logger::logf(Err, "Failed to get driver list @ GetUnsignedDrivers : error %d\n", GetLastError());
 #endif
             return unsignedDrivers;
@@ -182,7 +182,7 @@ list<wstring> Services::GetUnsignedDrivers()
 
         if (!foundWhitelisted && !Authenticode::HasSignature(fixedDriverPath.c_str(), TRUE))
         {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
             Logger::logfw(Warning, L"Found unsigned or outdated certificate on driver: %s\n", fixedDriverPath.c_str());
 #endif
             unsignedDrivers.push_back(fixedDriverPath);
@@ -219,7 +219,7 @@ BOOL Services::IsTestsigningEnabled()
 
     if (ntdll == NULL)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to fetch ntdll module address @ IsMachineAllowingSelfSignedDrivers. Error code : % lu\n", GetLastError());
 #endif
         return FALSE;
@@ -229,7 +229,7 @@ BOOL Services::IsTestsigningEnabled()
 
     if (!NtQuerySystemInformation)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Could not get NtQuerySystemInformation function address @ Handles::GetHandles");
 #endif
         return {};
@@ -298,7 +298,7 @@ BOOL Services::IsSecureBootEnabled()
     lResult = RegOpenKeyExA(HKEY_LOCAL_MACHINE, registryPath, 0, KEY_READ, &hKey);
     if (lResult != ERROR_SUCCESS)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Error opening registry key:  (%d) @ Services::IsSecureBootEnabled", GetLastError());
 #endif
         return FALSE;
@@ -308,7 +308,7 @@ BOOL Services::IsSecureBootEnabled()
 
     if (lResult != ERROR_SUCCESS)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Error querying registry value: %d @ Services::IsSecureBootEnabled", GetLastError());
 #endif
         RegCloseKey(hKey);
@@ -330,7 +330,7 @@ string Services::GetWindowsDrive()
     charCount = GetWindowsDirectoryA(volumePath, MAX_PATH);
     if (charCount == 0)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to retrieve Windows directory path @ Services::GetWindowsPath: %d\n", GetLastError());
 #endif
         return "";
@@ -339,7 +339,7 @@ string Services::GetWindowsDrive()
     CHAR volumeName[MAX_PATH];
     if (!GetVolumePathNameA(volumePath, volumeName, MAX_PATH))
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to retrieve volume path name @ Services::GetWindowsPath: %d\n", GetLastError());
 #endif
         return "";
@@ -359,7 +359,7 @@ wstring Services::GetWindowsDriveW()
     charCount = GetWindowsDirectoryW(volumePath, MAX_PATH);
     if (charCount == 0)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to retrieve Windows directory path @ Services::GetWindowsPathW: %d\n", GetLastError());
 #endif
         return L"";
@@ -368,7 +368,7 @@ wstring Services::GetWindowsDriveW()
     wchar_t volumeName[MAX_PATH];
     if (!GetVolumePathNameW(volumePath, volumeName, MAX_PATH))
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to retrieve volume path name @ Services::GetWindowsPathW: %d\n", GetLastError());
 #endif
         return L"";
@@ -410,7 +410,7 @@ list<DeviceW> Services::GetHardwareDevicesW()
 
     if (deviceInfoSet == INVALID_HANDLE_VALUE) 
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Warning, "SetupDiGetClassDevs failed with error: %d @ Services::GetHardwareDevicesW", GetLastError());
 #endif
         return {};
@@ -442,7 +442,7 @@ list<DeviceW> Services::GetHardwareDevicesW()
         {
             continue;
         }
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logfw(Info, L"Found Device: %s\n", d.Description.c_str());
 #endif
         deviceList.push_back(d);
@@ -450,7 +450,7 @@ list<DeviceW> Services::GetHardwareDevicesW()
 
     if (GetLastError() != ERROR_NO_MORE_ITEMS)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Warning, "SetupDiEnumDeviceInfo failed with error: %d @ Services::GetHardwareDevicesW", GetLastError());
 #endif
     }
@@ -521,7 +521,7 @@ WindowsVersion Services::GetWindowsVersion()
 
     if (status != 0)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Warning, "Services::GetWindowsMajorVersion failed with error: %x");
 #endif
         return ErrorUnknown;
@@ -633,7 +633,7 @@ bool Services::LoadDriver(__in const std::wstring& serviceName, __in const std::
 
     if (!hSCManager)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logfw(Warning, L"Failed to open SCM: %d", GetLastError());
 #endif
         return false;
@@ -658,7 +658,7 @@ bool Services::LoadDriver(__in const std::wstring& serviceName, __in const std::
         }
         else
         {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
             Logger::logfw(Warning, L"Failed to create service:  %d", GetLastError());
 #endif
             CloseServiceHandle(hSCManager);
@@ -670,7 +670,7 @@ bool Services::LoadDriver(__in const std::wstring& serviceName, __in const std::
     {
         if (GetLastError() != ERROR_SERVICE_ALREADY_RUNNING)
         {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
             Logger::logfw(Warning, L"Failed to start service: %d", GetLastError());
 #endif
             loadSuccess = false;
@@ -678,7 +678,7 @@ bool Services::LoadDriver(__in const std::wstring& serviceName, __in const std::
     }
 
     if(loadSuccess)
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logfw(Info, L"Driver %s loaded successfully.", serviceName.c_str());
 #endif
     CloseServiceHandle(hService);
@@ -698,7 +698,7 @@ bool Services::UnloadDriver(__in const std::wstring& serviceName)
 
     if (!hSCManager)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logfw(Warning, L"Failed to open SCM: %d", GetLastError());
 #endif
         return false;
@@ -708,7 +708,7 @@ bool Services::UnloadDriver(__in const std::wstring& serviceName)
 
     if (!hService)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logfw(Warning, L"Failed to open driver service: %d", GetLastError());
 #endif
         CloseServiceHandle(hSCManager);
@@ -719,13 +719,13 @@ bool Services::UnloadDriver(__in const std::wstring& serviceName)
 
     if (ControlService(hService, SERVICE_CONTROL_STOP, &status))     //stop driver
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logfw(Info, L"Driver stopped successfully.");
 #endif
     }
     else if (GetLastError() != ERROR_SERVICE_NOT_ACTIVE)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logfw(Warning, L"Failed to stop driver service: %d", GetLastError()); //don't return false yet incase the service was already stopped, in that case delete it
 #endif
         unloadSuccess = false;
@@ -733,14 +733,14 @@ bool Services::UnloadDriver(__in const std::wstring& serviceName)
 
     if (!DeleteService(hService))     //delete service
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logfw(Warning, L"Failed to delete driver service: %d", GetLastError());
 #endif
         unloadSuccess = false;
     }
 
     if(unloadSuccess)
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logfw(Info, L"Driver %s unloaded successfully.", serviceName.c_str());
 #endif
 
@@ -785,7 +785,7 @@ std::string Services::GetProcessDirectory(__in const DWORD pid)
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
     if (hProcess == nullptr)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to open process with PID %d @ GetProcessDirectory", pid);
 #endif
         return "";
@@ -806,14 +806,14 @@ std::string Services::GetProcessDirectory(__in const DWORD pid)
         }
         else
         {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
             Logger::logf(Err, "Failed to find directory in the image path (pid %d) @ GetProcessDirectory", pid);
 #endif
         }
     }
     else
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to query process image name with pid %d @ GetProcessDirectory", pid);
 #endif
     }
@@ -834,7 +834,7 @@ wstring Services::GetProcessDirectoryW(__in const DWORD pid)
 
     if (hProcess == nullptr)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to open process with PID %d @ GetProcessDirectory", pid);
 #endif
         return L"";
@@ -857,14 +857,14 @@ wstring Services::GetProcessDirectoryW(__in const DWORD pid)
         }
         else
         {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
             Logger::logf(Err, "Failed to find directory in the image path (pid %d) @ GetProcessDirectory", pid);
 #endif
         }
     }
     else
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to query process image name with pid %d @ GetProcessDirectory", pid);
 #endif
     }
@@ -883,7 +883,7 @@ bool Services::IsDriverRunning(__in const std::wstring& serviceName)
 
     if (!hSCManager)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logfw(Warning, L"Failed to open SCM: %d", GetLastError());
 #endif
         return false;
@@ -894,7 +894,7 @@ bool Services::IsDriverRunning(__in const std::wstring& serviceName)
 
     if (!hService)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logfw(Warning, L"Failed to open service %s: %d", serviceName.c_str(), GetLastError());
 #endif
         CloseServiceHandle(hSCManager);
@@ -905,7 +905,7 @@ bool Services::IsDriverRunning(__in const std::wstring& serviceName)
 
     if (!QueryServiceStatus(hService, &status))     //query the service status
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logfw(Warning, L"Failed to query service status: %d", GetLastError());
 #endif
         CloseServiceHandle(hService);

@@ -8,11 +8,11 @@ struct ModuleChecksumData
 {
 	HMODULE hMod;
 	std::wstring Name;
-	unordered_map<std::string, uint64_t> SectionChecksums; //stores checksums for each section in the module
+	unordered_map<std::string, uintptr_t> SectionChecksums; //stores checksums for each section in the module
 };
 
 /**
- * @brief Class that deals with checksums and runtime integrity
+ * @brief    Class that deals with checksums and runtime integrity
  *
  */
 class Integrity final
@@ -34,7 +34,7 @@ public:
 
 		if (this->ModuleList.empty())
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logf(Err, "Failed to retrieve loaded modules during Integrity class instantiation");
 #endif
 			throw std::runtime_error("Failed to retrieve loaded modules during Integrity class instantiation");
@@ -56,15 +56,14 @@ public:
 	Integrity operator*(Integrity& other) = delete;
 	Integrity operator/(Integrity& other) = delete;
 
-	static uint64_t FindWritableAddress(__in const std::string moduleName, __in const std::string sectionName);
+	static uintptr_t FindWritableAddress(__in const std::string moduleName, __in const std::string sectionName);
 
-	//static const uint64_t CalculateChecksum(HMODULE hMod);
-	static uint64_t CalculateChecksumFromSection(HMODULE hMod, const char* sectionName);
+	static uintptr_t CalculateChecksumFromSection(const std::string module, const char* sectionName);
 
-	static bool CompareChecksum(__in const HMODULE hMod, __in const char* section, __in const uint64_t previous_checksum);
-	static uint64_t GetSectionChecksumFromDisc(__in const std::wstring path, __in const char* sectionName);
+	static bool CompareChecksum(__in const std::string module, __in const char* section, __in const uintptr_t previous_checksum);
+	static uintptr_t GetSectionChecksumFromDisc(__in const std::wstring path, __in const char* sectionName);
 
-	bool CheckLoadedModuleHashVersusDiskHash(__in const HMODULE hMod, __in const char* sectionName, __in std::wstring diskFilePath);
+	bool CheckLoadedModuleHashVersusDiskHash(__in const std::string module, __in const char* sectionName, __in std::wstring diskFilePath);
 
 	void StoreModuleChecksum(ModuleChecksumData module) 
 	{
@@ -76,7 +75,7 @@ public:
 		}
 	}
 
-	uint64_t RetrieveModuleChecksum(__in const HMODULE hMod, __in const char* section) const
+	uintptr_t RetrieveModuleChecksum(__in const HMODULE hMod, __in const char* section) const
 	{
 		auto it = std::find_if(this->ModuleChecksums.begin(), this->ModuleChecksums.end(), [hMod](const ModuleChecksumData& m) { return (hMod == m.hMod); });
 

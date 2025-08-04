@@ -29,7 +29,7 @@ BOOL Process::CheckParentProcess(__in const wstring desiredParent, __in const bo
         }
 
 		if (!bFoundValidSignature)
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logf(Err, "Parent process %s does not have a valid signature", desiredParent.c_str());
 #endif
 
@@ -72,14 +72,14 @@ bool Process::HasExportedFunction(__in const string dllName, __in const  string 
             }
         }
         else
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
             Logger::log(Err, " ImageExportDirectory was NULL @ Process::HasExportedFunction");
 #endif
         
         UnMapAndLoad(&LoadedImage);
     }
     else
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "MapAndLoad failed: %d @ Process::HasExportedFunction \n", GetLastError());
 #endif
     
@@ -106,7 +106,7 @@ std::list<ProcessData::Section> Process::GetSections(__in const string module)
 
     if (pDoH == NULL || hInst == NULL)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, " PIMAGE_DOS_HEADER or hInst was NULL at Process::GetSections");
 #endif
         return Sections;
@@ -236,22 +236,22 @@ list<DWORD> Process::GetProcessIdsByName(__in const wstring procName)
     GetSectionAddress - Get the address of a named section of the module with the named `moduleName`
     returns a memory address of the section if found, and 0 if no section is found or an error occurs
 */
-UINT64 Process::GetSectionAddress(__in const HMODULE hModule, __in const  char* sectionName)
+uintptr_t Process::GetSectionAddress(__in const HMODULE hModule, __in const  char* sectionName)
 {
     if (hModule == NULL)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, " Failed to get module handle: %d @ GetSectionAddress\n", GetLastError());
 #endif
         return 0;
     }
 
-    UINT64 baseAddress = (UINT64)hModule;
+    uintptr_t baseAddress = (uintptr_t)hModule;
 
     PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)baseAddress;
     if (pDosHeader->e_magic != IMAGE_DOS_SIGNATURE)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, " Invalid DOS header @ GetSectionAddress.\n");
 #endif
         return 0;
@@ -260,7 +260,7 @@ UINT64 Process::GetSectionAddress(__in const HMODULE hModule, __in const  char* 
     PIMAGE_NT_HEADERS pNtHeaders = (PIMAGE_NT_HEADERS)(baseAddress + pDosHeader->e_lfanew);
     if (pNtHeaders->Signature != IMAGE_NT_SIGNATURE)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, " Invalid NT header @ GetSectionAddress.\n");
 #endif
         return 0;
@@ -280,7 +280,7 @@ UINT64 Process::GetSectionAddress(__in const HMODULE hModule, __in const  char* 
 
         pSectionHeader++;
     }
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
     Logger::logf(Warning, ".text section not found.\n");
 #endif
     return 0;
@@ -290,7 +290,7 @@ UINT64 Process::GetSectionAddress(__in const HMODULE hModule, __in const  char* 
     GetBytesAtAddress - return bytes from an address given `size`.
     returns a BYTE array filled with values from `address` for `size` number of bytes
 */
-BYTE* Process::GetBytesAtAddress(__in const UINT64 address, __in const  UINT size) //remember to free bytes if not NULL ret
+BYTE* Process::GetBytesAtAddress(__in const uintptr_t address, __in const  UINT size) //remember to free bytes if not NULL ret
 {
     BYTE* memBytes = new BYTE[size];
 
@@ -317,7 +317,7 @@ list<ProcessData::ImportFunction*> Process::GetIATEntries()
 
     if (hModule == NULL)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Couldn't fetch module handle @ Process::GetIATEntries ");
 #endif
         return (list<ProcessData::ImportFunction*>)NULL;
@@ -327,7 +327,7 @@ list<ProcessData::ImportFunction*> Process::GetIATEntries()
 
     if (dosHeader == nullptr)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Couldn't fetch dosHeader @ Process::GetIATEntries ");
 #endif
         return (list<ProcessData::ImportFunction*>)NULL;
@@ -404,7 +404,7 @@ bool Process::FillModuleList()
 
             if (GetModuleFileNameEx(GetCurrentProcess(), hModules[i], szModuleName, sizeof(szModuleName) / sizeof(TCHAR))) 
             {
-                module->name = wstring(szModuleName);
+                module->nameWithPath = wstring(szModuleName);
 
                 module->hModule = hModules[i];
 
@@ -415,7 +415,7 @@ bool Process::FillModuleList()
                 }
                 else
                 {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
                     Logger::logf(Err, "Unable to parse module information @ Process::FillModuleList");
 #endif
                     return false;
@@ -425,7 +425,7 @@ bool Process::FillModuleList()
             }
             else
             {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
                 Logger::logf(Err, "Unable to parse module named @ Process::FillModuleList");
 #endif
                 return false;
@@ -434,7 +434,7 @@ bool Process::FillModuleList()
     }
     else
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "EnumProcessModules failed @ Process::FillModuleList");
 #endif
         return false;
@@ -461,9 +461,9 @@ FARPROC Process::_GetProcAddress(__in const PCSTR Module, __in const LPCSTR lpPr
     _LOADED_IMAGE LoadedImage;
     char* sName = NULL;
 
-    UINT64 AddressFound = NULL;
+    uintptr_t AddressFound = NULL;
 
-    UINT64 ModuleBase = (UINT64)GetModuleHandleA(Module); //last remaining artifacts for detection. TODO: Use PEB to fetch this instead of API
+    uintptr_t ModuleBase = (uintptr_t)GetModuleHandleA(Module); //last remaining artifacts for detection. TODO: Use PEB to fetch this instead of API
 
     if (ModuleBase == NULL)
         return NULL;
@@ -491,7 +491,7 @@ FARPROC Process::_GetProcAddress(__in const PCSTR Module, __in const LPCSTR lpPr
         }
         else
         {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
             Logger::logf(Err, "ImageExportDirectory was NULL @ Process::_GetProcAddress with module %s and function %s", Module, lpProcName);
 #endif
             UnMapAndLoad(&LoadedImage);
@@ -502,7 +502,7 @@ FARPROC Process::_GetProcAddress(__in const PCSTR Module, __in const LPCSTR lpPr
     }
     else
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "MapAndLoad failed @ Process::_GetProcAddress with module %s and function %s", Module, lpProcName);
 #endif
         return (FARPROC)NULL;
@@ -515,11 +515,11 @@ FARPROC Process::_GetProcAddress(__in const PCSTR Module, __in const LPCSTR lpPr
     IsReturnAddressInModule - returns true if RetAddr is module's mem region
     Used to detect attackers calling our functions such as heartbeat generation, since they may try to spoof or emulate the net client
 */
-bool Process::IsReturnAddressInModule(__in const UINT64 RetAddr, __in const  wchar_t* module)
+bool Process::IsReturnAddressInModule(__in const uintptr_t RetAddr, __in const  wchar_t* module)
 {
     if (RetAddr == 0)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "RetAddr was 0 @ : Process::IsReturnAddressInModule");
 #endif
         return false;
@@ -539,16 +539,16 @@ bool Process::IsReturnAddressInModule(__in const UINT64 RetAddr, __in const  wch
 
     if (size == 0)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "size was 0 @ : Process::IsReturnAddressInModule");
 #endif
         return false;
     }
 
-    if (RetAddr >= (UINT64)retBase && RetAddr < ((UINT64)retBase + size))    
+    if (RetAddr >= (uintptr_t)retBase && RetAddr < ((uintptr_t)retBase + size))
         return true;
-    else
-        return false;
+ 
+    return false;
 }
 
 /*
@@ -571,14 +571,14 @@ wstring Process::GetProcessName(__in const DWORD pid)
             }
             else 
             {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
                 Logger::logf(Err, "GetModuleBaseName failed with error %d @  Process::GetProcessName", GetLastError());
 #endif
             }
         }
         else 
         {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
             Logger::logf(Err, "EnumProcessModules failed with error %d @  Process::GetProcessName", GetLastError());
 #endif
         }
@@ -586,7 +586,7 @@ wstring Process::GetProcessName(__in const DWORD pid)
     }
     else 
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "OpenProcess failed with error %d @  Process::GetProcessName", GetLastError());
 #endif
     }
@@ -621,7 +621,7 @@ std::vector<ProcessData::MODULE_DATA> Process::GetLoadedModules()
         MY_LDR_DATA_TABLE_ENTRY* module_entry = (MY_LDR_DATA_TABLE_ENTRY*)CONTAINING_RECORD(current_record, MY_LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
         ProcessData::MODULE_DATA module;
 
-        module.name =  wstring(module_entry->FullDllName.Buffer);
+        module.nameWithPath =  wstring(module_entry->FullDllName.Buffer);
         module.baseName = wstring(module_entry->BaseDllName.Buffer);
 
         module.hModule = (HMODULE)module_entry->DllBase;
@@ -667,7 +667,7 @@ ProcessData::MODULE_DATA* Process::GetModuleInfo(__in const  wchar_t* name)
         {
             ProcessData::MODULE_DATA* module = new ProcessData::MODULE_DATA();
 
-            module->name = wstring(module_entry->FullDllName.Buffer);
+            module->nameWithPath = wstring(module_entry->FullDllName.Buffer);
             module->baseName =  wstring(module_entry->BaseDllName.Buffer);
             module->hModule = (HMODULE)module_entry->DllBase;
             module->dllInfo.lpBaseOfDll = module_entry->DllBase;
@@ -729,7 +729,7 @@ DWORD Process::GetSectionSize(__in const HMODULE hModule, __in const std::string
 {
     if (hModule == NULL || section.empty())
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Invalid parameter @ GetTextSectionSize");
 #endif
         return 0;
@@ -738,7 +738,7 @@ DWORD Process::GetSectionSize(__in const HMODULE hModule, __in const std::string
     PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)hModule;
     if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Invalid DOS signature @ GetTextSectionSize");
 #endif
         return 0;
@@ -747,7 +747,7 @@ DWORD Process::GetSectionSize(__in const HMODULE hModule, __in const std::string
     PIMAGE_NT_HEADERS ntHeaders = (PIMAGE_NT_HEADERS)((BYTE*)hModule + dosHeader->e_lfanew);
     if (ntHeaders->Signature != IMAGE_NT_SIGNATURE)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Invalid NT signature @ GetTextSectionSize");
 #endif
         return 0;
@@ -859,7 +859,7 @@ std::vector<BYTE> Process::ReadRemoteTextSection(__in const DWORD pid)
 
     if (!hProcess) 
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to open process. Error: %d", GetLastError());
 #endif
         return {};
@@ -870,7 +870,7 @@ std::vector<BYTE> Process::ReadRemoteTextSection(__in const DWORD pid)
 
     if (!GetProcessTextSection(hProcess, baseAddress, sectionSize)) 
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::log(Err, "Failed to find the .text section.");
 #endif
         CloseHandle(hProcess);
@@ -882,7 +882,7 @@ std::vector<BYTE> Process::ReadRemoteTextSection(__in const DWORD pid)
     SIZE_T bytesRead = 0;
     if (!ReadProcessMemory(hProcess, reinterpret_cast<LPCVOID>(baseAddress), buffer.data(), sectionSize, &bytesRead)) 
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to read memory. Error: %d",  GetLastError());
 #endif
         CloseHandle(hProcess);

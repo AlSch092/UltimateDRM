@@ -8,7 +8,7 @@ void Debugger::AntiDebug::StartAntiDebugThread()
 {
 	if (this->GetSettings() != nullptr && !this->GetSettings()->bUseAntiDebugging)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logf(Info, "Anti-Debugger was disabled in settings, debugging will be allowed");
 #endif
 		return;
@@ -16,7 +16,7 @@ void Debugger::AntiDebug::StartAntiDebugThread()
 
 	this->DetectionThread = make_unique<Thread>((LPTHREAD_START_ROUTINE)Debugger::AntiDebug::CheckForDebugger, (LPVOID)this, true, false);
 
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 	Logger::logf(Info, "Created Debugger detection thread with Id: %d", this->DetectionThread->GetId());
 #endif
 }
@@ -28,7 +28,7 @@ void Debugger::AntiDebug::CheckForDebugger(LPVOID AD)
 {
 	if (AD == nullptr)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logf(Err, "AntiDbg class was NULL @ CheckForDebugger");
 #endif
 		return;
@@ -36,7 +36,7 @@ void Debugger::AntiDebug::CheckForDebugger(LPVOID AD)
 
 	Debugger::AntiDebug* AntiDbg = reinterpret_cast<Debugger::AntiDebug*>(AD);
 
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 	Logger::logf(Info, "STARTED Debugger detection thread");
 #endif
 
@@ -48,7 +48,7 @@ void Debugger::AntiDebug::CheckForDebugger(LPVOID AD)
 	{
 		if (AntiDbg == NULL)
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logf(Err, "AntiDbg class was NULL @ CheckForDebugger");
 #endif
 			return;
@@ -56,7 +56,7 @@ void Debugger::AntiDebug::CheckForDebugger(LPVOID AD)
 
 		if (AntiDbg->DetectionThread->IsShutdownSignalled())
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logf(Info, "Shutting down Debugger detection thread with Id: %d", AntiDbg->DetectionThread->GetId());
 #endif
 			return; //exit thread
@@ -66,7 +66,7 @@ void Debugger::AntiDebug::CheckForDebugger(LPVOID AD)
 
 		if (CheckHardwareRegistersThread == INVALID_HANDLE_VALUE || CheckHardwareRegistersThread == NULL)
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logf(Warning, "Failed to create new thread to call _IsHardwareDebuggerPresent: %d", GetLastError());
 #endif
 		}
@@ -77,7 +77,7 @@ void Debugger::AntiDebug::CheckForDebugger(LPVOID AD)
 
 		if (AntiDbg->RunDetectionFunctions())
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logf(Info, "Atleast one debugger detection function caught a debugger!"); //optionally, iterate over DetectedMethods list if you want a more granular logging 
 #endif
 		}
@@ -98,7 +98,7 @@ void Debugger::AntiDebug::_IsHardwareDebuggerPresent(LPVOID AD)
 {
 	if (AD == nullptr)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logf(Err, "AntiDbg class was NULL @ _IsHardwareDebuggerPresent");
 #endif
 		return;
@@ -112,7 +112,7 @@ void Debugger::AntiDebug::_IsHardwareDebuggerPresent(LPVOID AD)
 	HANDLE hThreadSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
 	if (hThreadSnap == INVALID_HANDLE_VALUE)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logf(Err, "Error: unable to create toolhelp snapshot: %d\n", GetLastError());
 #endif
 		return;
@@ -130,7 +130,7 @@ void Debugger::AntiDebug::_IsHardwareDebuggerPresent(LPVOID AD)
 
 				if (hThread == NULL)
 				{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 					Logger::logf(Warning, "Error: unable to OpenThread on thread with id %d\n", te32.th32ThreadID);
 #endif
 					continue;
@@ -145,7 +145,7 @@ void Debugger::AntiDebug::_IsHardwareDebuggerPresent(LPVOID AD)
 				{
 					if (context.Dr0 || context.Dr1 || context.Dr2 || context.Dr3 || context.Dr6 || context.Dr7)
 					{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 						Logger::logf(Detection, "Found at least one debug register enabled (hardware debugging)");
 #endif
 						ResumeThread(hThread);
@@ -159,7 +159,7 @@ void Debugger::AntiDebug::_IsHardwareDebuggerPresent(LPVOID AD)
 				}
 				else
 				{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 					Logger::logf(Err, "GetThreadContext failed with: %d", GetLastError());
 #endif
 					ResumeThread(hThread);
@@ -174,7 +174,7 @@ void Debugger::AntiDebug::_IsHardwareDebuggerPresent(LPVOID AD)
 	}
 	else
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logf(Err, "Thread32First Failed: %d\n", GetLastError());
 #endif
 		return;
@@ -193,7 +193,7 @@ bool Debugger::AntiDebug::PreventWindowsDebuggers()
 
 	if (!ntdll)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logf(Err, "Failed to find ntdll.dll @ AntiDebug::PreventWindowsDebuggers");
 #endif
 		return false;
@@ -214,7 +214,7 @@ bool Debugger::AntiDebug::PreventWindowsDebuggers()
 			}
 			__except(EXCEPTION_EXECUTE_HANDLER)
 			{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 				Logger::logf(Err, "Failed to patch over DbgBreakpoint @ AntiDebug::PreventWindowsDebuggers");
 #endif
 				return false;
@@ -234,7 +234,7 @@ bool Debugger::AntiDebug::PreventWindowsDebuggers()
 			}
 			__except (EXCEPTION_EXECUTE_HANDLER)
 			{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 				Logger::logf(Err, "Failed to patch over DbgUiRemoteBreakin @ AntiDebug::PreventWindowsDebuggers");
 #endif
 				return false;

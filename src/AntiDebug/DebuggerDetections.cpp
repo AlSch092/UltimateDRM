@@ -18,7 +18,7 @@ bool DebuggerDetections::_IsKernelDebuggerPresent()
 
 	if (hModule == NULL)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logf(Err, "Error fetching module ntdll.dll @ _IsKernelDebuggerPresent: %d", GetLastError());
 #endif
 		return false;
@@ -83,7 +83,7 @@ bool DebuggerDetections::_IsDebuggerPresent_HeapFlags()
 		}
 		__except (EXCEPTION_EXECUTE_HANDLER)
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logf(Warning, "Failed to dereference heapForceFlagsPtr @ _IsDebuggerPresent_HeapFlags");
 #endif
 			return false;
@@ -170,7 +170,7 @@ bool DebuggerDetections::_IsDebuggerPresent_VEH()
 
 			if (!VirtualProtect((void*)veh_addr, 1, PAGE_EXECUTE_READWRITE, &dwOldProt))
 			{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 				Logger::logf(Warning, "VirtualProtect failed @ _IsDebuggerPresent_VEH");
 #endif
 				return true; //return true since we found the routine, even though we can't patch over it. if virtualprotect fails, the program will probably crash if trying to patch it
@@ -180,7 +180,7 @@ bool DebuggerDetections::_IsDebuggerPresent_VEH()
 
 			if (!VirtualProtect((void*)veh_addr, 1, dwOldProt, &dwOldProt)) //change back to old prot's
 			{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 				Logger::logf(Warning, "VirtualProtect failed @ _IsDebuggerPresent_VEH");
 #endif
 			}
@@ -240,14 +240,14 @@ bool DebuggerDetections::_IsDebuggerPresent_DebugPort()
 		}
 		else
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logf(Warning, "Failed to fetch NtQueryInformationProcess address @ _IsDebuggerPresent_DebugPort ");
 #endif
 		}
 	}
 	else
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logf(Warning, "Failed to fetch ntdll.dll address @ _IsDebuggerPresent_DebugPort ");
 #endif
 	}
@@ -283,7 +283,7 @@ bool DebuggerDetections::_IsDebuggerPresent_ProcessDebugFlags()
 	}
 	else
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logf(Warning, "Failed to fetch ntdll.dll address @ _IsDebuggerPresent_ProcessDebugFlags ");
 #endif
 	}
@@ -309,7 +309,7 @@ bool DebuggerDetections::_ExitCommonDebuggers()
 
 			if (K32Base == NULL)
 			{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 				Logger::logf(Warning, "Failed to fetch kernel32.dll address @ _ExitCommonDebuggers ");
 #endif
 				return false;
@@ -319,7 +319,7 @@ bool DebuggerDetections::_ExitCommonDebuggers()
 
 			if (ExitProcessAddr == NULL)
 			{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 				Logger::logf(Warning, "Failed to fetch ExitProcess address @ _ExitCommonDebuggers ");
 #endif
 				return false;
@@ -331,17 +331,17 @@ bool DebuggerDetections::_ExitCommonDebuggers()
 
 			if (remoteProcHandle)
 			{
-				uint64_t FunctionAddr_ExitProcess = (uint64_t)Process::GetRemoteModuleBaseAddress(pid, L"kernel32.dll") + ExitProcessOffset;
+				uintptr_t FunctionAddr_ExitProcess = (uintptr_t)Process::GetRemoteModuleBaseAddress(pid, L"kernel32.dll") + ExitProcessOffset;
 				HANDLE RemoteThread = CreateRemoteThread(remoteProcHandle, 0, 0, (LPTHREAD_START_ROUTINE)FunctionAddr_ExitProcess, 0, 0, 0);
 				triedEndDebugger = true;
 				CloseHandle(remoteProcHandle);
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 				Logger::logf(Info, "Created remote thread at %llX address", FunctionAddr_ExitProcess);
 #endif
 			}
 			else
 			{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 				Logger::logf(Warning, "Failed to open process handle for pid %d @ _ExitCommonDebuggers", pid);
 #endif
 			}

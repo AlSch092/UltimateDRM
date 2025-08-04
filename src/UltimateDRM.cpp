@@ -1,11 +1,13 @@
 // UltimateDRM.cpp : Defines the functions for the static library.
 // C++ 14 is being used to help compatability with older projects
-// This project aims to take the good parts of UltimateAnticheat while improving the parts which were messy or implemented poorly
+// By AlSch092 @ Github
 
+#ifdef _M_X64
+#include "../include/remap.hpp"
+#endif
 #include "../include/DRM.hpp"
 #include "../include/Settings.hpp"
 #include "../include/MapProtectedClass.hpp"
-#include "../include/remap.hpp"
 #include "../include/Logger.hpp"
 #include "../include/LicenseManager.hpp"
 #include "../include/Integrity.hpp"
@@ -37,7 +39,7 @@ Settings* Settings::Instance = nullptr; //singleton static instance decl to avoi
 	** There is no such thing as an 'uncrackable DRM', and allowing offline product usage makes things much tougher to enforce **
 	** Any parts of code which run on the client side will never be tamper-proof **
 
-	This class is designed to handle a single module. The protected program should include this .lib and .hpp and use the DRM class
+	The protected program should include this .lib and .hpp and use the DRM class
 */
 struct DRM::Impl
 {
@@ -150,7 +152,7 @@ bool DRM::Protect()
 {
 	if (!this->pImpl->StopMultipleProcessInstances()) //prevent multiple client instances by using shared memory-mapped region
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logf(Err, "Could not initialize program: shared memory check failed, make sure only one instance of the program is open. Shutting down.");
 #endif
 		terminate();
@@ -198,7 +200,7 @@ bool DRM::Protect()
 			{
 				if (!Authenticode::HasSignature(std::wstring(parentProcDirectory + parentProcName).c_str(), TRUE))
 				{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 					Logger::logf(Err, "Parent process lacks a valid code signature!");
 #endif
 					throw DRMException(DRMException::CodeSigningFailed);
@@ -218,7 +220,7 @@ bool DRM::Protect()
 
 		if (!verifiedParent)
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logf(Err, "Could not initialize program: Parent process is not allowed or does not have a valid code signature");
 #endif
 			throw DRMException::BadParentProcess;
@@ -227,27 +229,34 @@ bool DRM::Protect()
 
 	if (Settings::Instance->bCheckIntegrity)
 	{
+#ifdef _M_X64
 #ifndef _DEBUG
-		//if (!RmpRemapImage((ULONG_PTR)GetModuleHandle(NULL))) //possibly  causes Defender false positive? Debug compilation does not throw false positive, where this is excluded
-		//{
-		//	throw std::runtime_error("Failed to remap program sections");
-		//}
-#endif
-		uint64_t moduleTextChecksum = Integrity::CalculateChecksumFromSection(GetModuleHandle(NULL), ".text");
-		uint64_t moduleRDataChecksum = Integrity::CalculateChecksumFromSection(GetModuleHandle(NULL), ".rdata");
-
-		if (moduleTextChecksum == 0 || moduleRDataChecksum == 0)
+		if (!RmpRemapImage((ULONG_PTR)GetModuleHandle(NULL))) //possibly  causes Defender false positive? Debug compilation does not throw false positive, where this is excluded
 		{
-			throw std::runtime_error("Failed to calculate module's checksums");
+			throw std::runtime_error("Failed to remap program sections");
 		}
+#endif
+#endif
+		auto ModuleList = Process::GetLoadedModules();
 
-		ModuleChecksumData moduleChecksum;
-		moduleChecksum.hMod = GetModuleHandle(NULL);
-		moduleChecksum.Name = Process::GetProcessName(GetCurrentProcessId());
-		moduleChecksum.SectionChecksums[".text"] = moduleTextChecksum;
-		moduleChecksum.SectionChecksums[".rdata"] = moduleRDataChecksum;
+		for (auto module : ModuleList) //store hashes of all loaded modules
+		{
+			uintptr_t moduleTextChecksum = Integrity::CalculateChecksumFromSection(Utility::ConvertWStringToString(module.baseName), ".text");
+			uintptr_t moduleRDataChecksum = Integrity::CalculateChecksumFromSection(Utility::ConvertWStringToString(module.baseName), ".rdata");
 
-		this->pImpl->IntegrityChecker->StoreModuleChecksum(moduleChecksum); //tested and working fine
+			if (moduleTextChecksum == 0 || moduleRDataChecksum == 0)
+			{
+				throw std::runtime_error("Failed to calculate module's checksums");
+			}
+
+			ModuleChecksumData moduleChecksum;
+			moduleChecksum.hMod = module.hModule;
+			moduleChecksum.Name = module.baseName;
+			moduleChecksum.SectionChecksums[".text"] = moduleTextChecksum;
+			moduleChecksum.SectionChecksums[".rdata"] = moduleRDataChecksum;
+
+			this->pImpl->IntegrityChecker->StoreModuleChecksum(moduleChecksum); //tested and working fine
+		}		
 	}
 
 	if (Settings::Instance->bRequireCodeSigning)
@@ -260,7 +269,7 @@ bool DRM::Protect()
 		{
 			if (!Authenticode::HasSignature(fullProcessPath.c_str(), TRUE)) //check if the current process has a valid signature
 			{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 				Logger::logf(Err, "Could not initialize program: Parent process lacked proper code signature");
 #endif
 				return false;
@@ -286,7 +295,7 @@ bool DRM::Protect()
 					hypervisorVendor == "XenVMMXenVMM" ||
 					hypervisorVendor == "VBoxVBoxVBox")
 				{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 						Logger::logf(Err, "Hypervisor detected: %s. Shutting down.", hypervisorVendor.c_str());
 #endif
 						throw DRMException(DRMException::HypervisorDetected);
@@ -318,7 +327,7 @@ bool DRM::Impl::StopMultipleProcessInstances()
 
 	if (hSharedMemory == NULL)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logf(Err, "Failed to create shared memory. Error code: %lu\n", GetLastError());
 #endif
 		return false;
@@ -328,7 +337,7 @@ bool DRM::Impl::StopMultipleProcessInstances()
 
 	if (pIsRunning == NULL)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logf(Err, "Failed to map view of file. Error code : % lu\n", GetLastError());
 #endif
 		CloseHandle(hSharedMemory);
@@ -367,7 +376,7 @@ bool DRM::Impl::StopMultipleProcessInstances()
  */
 void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 {
-	static uint32_t ThreadExecutionAddressStackOffset = 0; //** Windows10 only, this offset on the stack does not have a return address on Windows 11
+	static uintptr_t ThreadExecutionAddressStackOffset = 0; //** Windows10 only, this offset on the stack does not have a return address on Windows 11
 	static bool bFirstProcessAttach = true;
 	static WindowsVersion WinVersion = WindowsVersion::ErrorUnknown;
 
@@ -382,13 +391,17 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 			WinVersion = Services::GetWindowsVersion();
 
 			if (WinVersion == Windows10)
+#ifdef _M_X64
 				ThreadExecutionAddressStackOffset = 0x378;
+#else
+				ThreadExecutionAddressStackOffset = 0x26C;
+#endif
 
 			SetUnhandledExceptionFilter(g_VectoredExceptionHandler);
 
 			if (!AddVectoredExceptionHandler(1, g_VectoredExceptionHandler))
 			{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 				Logger::logf(Err, " Failed to register Vectored Exception Handler @ TLSCallback: %d\n", GetLastError());
 #endif
 				throw std::runtime_error("Failed to register Vectored Exception Handler");
@@ -405,7 +418,7 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 #ifndef _DEBUG
 		if (!Debugger::AntiDebug::HideThreadFromDebugger(GetCurrentThread())) //hide thread from debuggers, placing this in the TLS callback allows all threads to be hidden
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logf(Warning, " Failed to hide thread from debugger @ TLSCallback: thread id %d\n", GetCurrentThreadId());
 #endif
 		}
@@ -414,7 +427,7 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 		if (WinVersion == WindowsVersion::Windows11) //thread start address is not on the stack in windows 11
 			return;
 
-		uint64_t ThreadStartAddress = *(uint64_t*)((uint64_t)_AddressOfReturnAddress() + ThreadExecutionAddressStackOffset);
+		uintptr_t ThreadStartAddress = *(uintptr_t*)((uintptr_t)_AddressOfReturnAddress() + ThreadExecutionAddressStackOffset);
 
 		if (!ThreadStartAddress)
 			return;
@@ -423,7 +436,7 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 
 		for (auto module : moduleList)
 		{
-			if (ThreadStartAddress > ((uint64_t)module.dllInfo.lpBaseOfDll) && ThreadStartAddress < ((uint64_t)module.dllInfo.lpBaseOfDll + module.dllInfo.SizeOfImage))
+			if (ThreadStartAddress > ((uintptr_t)module.dllInfo.lpBaseOfDll) && ThreadStartAddress < ((uintptr_t)module.dllInfo.lpBaseOfDll + module.dllInfo.SizeOfImage))
 			{
 				return; // thread is executing within a valid module range, no need to suppress/exit it
 			}
@@ -433,7 +446,7 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 
 		if (!VirtualProtect((LPVOID)ThreadStartAddress, sizeof(uint8_t), PAGE_EXECUTE_READWRITE, &dwOldProt)) //make thread start address writable
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logf(Warning, "Failed to call VirtualProtect on ThreadStart address @ TLSCallback: %llX", ThreadStartAddress);
 #endif
 		}
@@ -471,7 +484,7 @@ LONG WINAPI g_VectoredExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo)
 {
 	DWORD exceptionCode = ExceptionInfo->ExceptionRecord->ExceptionCode;
 
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 	Logger::logf(Err, "Vectored Exception Handler called with exception code : 0x%08X\n", exceptionCode);
 #endif
 	return EXCEPTION_CONTINUE_SEARCH;

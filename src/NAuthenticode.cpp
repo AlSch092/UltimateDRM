@@ -63,7 +63,7 @@ BOOL Authenticode::VerifyEmbeddedSignature(__in const LPCWSTR filePath, __in con
 
         if (status == CERT_E_REVOKED || status == CERT_E_EXPIRED || status == CERT_E_UNTRUSTEDROOT || status == CERT_E_CHAINING)
         {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::log(LogType::Detection, "Revoked or expired signature detected");
 #endif
 			return FALSE;
@@ -94,7 +94,7 @@ BOOL Authenticode::VerifyCatalogSignature(__in const LPCWSTR filePath, __in cons
     HANDLE hFile = CreateFileW(filePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) 
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logfw(LogType::Warning, L"Could not open file: %s @ VerifyCatalogSignature", filePath);
 #endif
         return false;
@@ -216,7 +216,7 @@ BOOL Authenticode::GetDateOfTimeStamp(PCMSG_SIGNER_INFO pSignerInfo, SYSTEMTIME*
                 &dwData);
             if (!fResult)
             {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
                 Logger::logf(Err, "CryptDecodeObject failed with %x @ Authenticode::GetTimeStampSignerInfo", GetLastError());
 #endif
                 break;
@@ -294,7 +294,7 @@ BOOL Authenticode::GetProgAndPublisherInfo(__in PCMSG_SIGNER_INFO pSignerInfo, _
                     &dwData);
                 if (!fResult)
                 {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
                     Logger::logf(Err, "CryptDecodeObject failed with %x @ Authenticode::GetProgAndPublisherInfo", GetLastError());
 #endif
                     __leave;
@@ -304,7 +304,7 @@ BOOL Authenticode::GetProgAndPublisherInfo(__in PCMSG_SIGNER_INFO pSignerInfo, _
                 OpusInfo = (PSPC_SP_OPUS_INFO)LocalAlloc(LPTR, dwData);
                 if (!OpusInfo)
                 {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
                     Logger::logf(Err, "Unable to allocate memory for publisher info @ Authenticode::GetProgAndPublisherInfo");
 #endif
                     __leave;
@@ -320,7 +320,7 @@ BOOL Authenticode::GetProgAndPublisherInfo(__in PCMSG_SIGNER_INFO pSignerInfo, _
                     &dwData);
                 if (!fResult)
                 {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
                     Logger::logf(Err, "CryptDecodeObject failed with %x @ Authenticode::GetProgAndPublisherInfo", GetLastError());
 #endif
                     __leave;
@@ -440,7 +440,7 @@ BOOL Authenticode::GetTimeStampSignerInfo(__in PCMSG_SIGNER_INFO pSignerInfo, __
                     &dwSize);
                 if (!fResult)
                 {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
                     Logger::logf(Err, "CryptDecodeObject failed with %x @ Authenticode::GetTimeStampSignerInfo", GetLastError());
 #endif
                     __leave;
@@ -450,7 +450,7 @@ BOOL Authenticode::GetTimeStampSignerInfo(__in PCMSG_SIGNER_INFO pSignerInfo, __
                 *pCounterSignerInfo = (PCMSG_SIGNER_INFO)LocalAlloc(LPTR, dwSize);
                 if (!*pCounterSignerInfo)
                 {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
                     Logger::logf(Err, "Unable to allocate memory for timestamp info @ Authenticode::GetTimeStampSignerInfo");
 #endif
                     __leave;
@@ -467,7 +467,7 @@ BOOL Authenticode::GetTimeStampSignerInfo(__in PCMSG_SIGNER_INFO pSignerInfo, __
                     &dwSize);
                 if (!fResult)
                 {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
                     Logger::logf(Err, "CryptDecodeObject failed with %x @ Authenticode::GetTimeStampSignerInfo", GetLastError());
 #endif
                     __leave;
@@ -506,7 +506,7 @@ wstring Authenticode::GetCertificateSubject(__in PCCERT_CONTEXT pCertContext)
     // Get Issuer name size.
     if (!(dwData = CertGetNameString(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, CERT_NAME_ISSUER_FLAG, NULL, NULL, 0)))
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "CertGetNameString failed @ GetCertificateSubject");
 #endif
         goto end;
@@ -515,7 +515,7 @@ wstring Authenticode::GetCertificateSubject(__in PCCERT_CONTEXT pCertContext)
     szName = (LPTSTR)LocalAlloc(LPTR, dwData * sizeof(TCHAR));     // Allocate memory for Issuer name.
     if (!szName) 
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Unable to allocate memory for issuer name @ GetCertificateSubject");
 #endif
         goto end;
@@ -523,7 +523,7 @@ wstring Authenticode::GetCertificateSubject(__in PCCERT_CONTEXT pCertContext)
 
     if (!(CertGetNameString(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, CERT_NAME_ISSUER_FLAG, NULL, szName, dwData)))    // Get Issuer name.
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "CertGetNameString failed @ GetCertificateSubject");
 #endif
         goto end;
@@ -534,7 +534,7 @@ wstring Authenticode::GetCertificateSubject(__in PCCERT_CONTEXT pCertContext)
 
     if (!(dwData = CertGetNameString(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL, NULL, 0)))     // Get Subject name size.
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "CertGetNameString failed @ GetCertificateSubject");
 #endif
         goto end;
@@ -543,7 +543,7 @@ wstring Authenticode::GetCertificateSubject(__in PCCERT_CONTEXT pCertContext)
     szName = (LPTSTR)LocalAlloc(LPTR, dwData * sizeof(TCHAR));
     if (!szName)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Unable to allocate memory for subject name @ GetCertificateSubject");
 #endif
         goto end;
@@ -551,7 +551,7 @@ wstring Authenticode::GetCertificateSubject(__in PCCERT_CONTEXT pCertContext)
 
     if (!(CertGetNameString(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL, szName, dwData)))     // Get subject name
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "CertGetNameString failed @ GetCertificateSubject");
 #endif
         goto end;
@@ -606,7 +606,7 @@ wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
         NULL);
     if (!fResult)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "CryptQueryObject failed with %x @ GetSignerFromFile", GetLastError());
 #endif
         return {};
@@ -617,7 +617,7 @@ wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
 
     if (!fResult)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "CryptMsgGetParam failed with %x @ GetSignerFromFile", GetLastError());
 #endif
         return {};
@@ -628,7 +628,7 @@ wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
 
     if (!pSignerInfo)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Unable to allocate memory for Signer Info @ GetSignerFromFile");
 #endif
         return {};
@@ -639,7 +639,7 @@ wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
 
     if (!fResult)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "CryptMsgGetParam failed with %x @ GetSignerFromFile", GetLastError());
 #endif
         return {};
@@ -681,7 +681,7 @@ wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
         NULL);
     if (!pCertContext)
     {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "CertFindCertificateInStore failed with %x @ GetSignerFromFile", GetLastError());
 #endif
         return {};

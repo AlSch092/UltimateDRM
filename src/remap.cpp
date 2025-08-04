@@ -1,3 +1,4 @@
+#ifdef _M_X64
 #include "../include/remap.hpp"
 #include "../include/Definitions.hpp"
 #include "../include/Logger.hpp"
@@ -676,3 +677,5 @@ RmppValidateRemappedPeSectionProtection(
 exit:
     return status;
 }
+
+#endif //#ifdef _M_X64

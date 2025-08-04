@@ -1,9 +1,11 @@
 #pragma once
 #include "Settings.hpp"
-
-/*
-    The PIMPL idiom hides implementation details for static libraries. The actual implementation and members of the class are in DRM.cpp
-*/
+#include "DRMException.hpp"
+  
+/**
+ * @brief The PIMPL idiom hides implementation details for static libraries. The actual implementation and members of the class are in DRM.cpp
+ *
+ */
 class DRM 
 {
 public:

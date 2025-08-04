@@ -28,9 +28,7 @@ const WORD ConsoleTextColors[] =
 class Logger final
 {
 public:
-    static std::string logFileName;
-    static bool enableLogging;
-
+    
     static int getLogColor(LogType type) {
         const std::map<LogType, int> logColors = {
             { LogType::Detection,  ConsoleTextColors[0]},
@@ -43,11 +41,8 @@ public:
 
     static void logToFile(std::string& message) 
     {
-        if (logFileName.empty()) 
-        {
-            return;
-        }
-        
+        static std::string logFileName = "UltimateDRM.log";
+
         std::ofstream logFile(logFileName, std::ios::out | std::ios::app);
 
         if (!logFile.is_open())
@@ -73,13 +68,6 @@ public:
 
     static void log(LogType type, const std::string& message)
     {
-        if (!enableLogging) 
-        {
-            return;
-        }
-
-        std::lock_guard<std::mutex> lock(consoleMutex);
-
         std::string msg_with_errorcode;
 
         const std::map<LogType, const std::string> msgsTypes = 
@@ -102,11 +90,8 @@ public:
 
     static void logToWFile(std::wstring& message) 
     {
-        if (logFileName.empty()) 
-        {
-            return;
-        }
-        
+        static std::string logFileName = "UltimateDRM.log";
+
         std::wofstream logFile(logFileName, std::ios::out | std::ios::app);
         
         if (!logFile.is_open())
@@ -135,13 +120,6 @@ public:
 
     static void logw(LogType type, const std::wstring& message)
     {
-        if (!enableLogging) 
-        {
-            return;
-        }
-
-        std::lock_guard<std::mutex> lock(consoleMutex);
-
         std::wstring msg_with_errorcode;
 
         const std::map<LogType, const std::wstring> msgsTypes =
@@ -219,6 +197,4 @@ public:
 		logf(Err, format, args...);
         return false;
     }
-
-    static std::mutex consoleMutex;//prevent race conditions with text color changing
 };

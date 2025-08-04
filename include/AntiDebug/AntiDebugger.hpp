@@ -46,7 +46,7 @@ namespace Debugger
         {
             if (s == nullptr)
             {
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
                 Logger::logf(Warning, "Settings object pointer was somehow nullptr, unknown behavior may take place @ AntiDebug::AntiDebug()");
 #endif
             }

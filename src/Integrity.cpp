@@ -1,76 +1,5 @@
+//By AlSch092 @ Github
 #include "../include/Integrity.hpp"
-
-/**
- * @brief Calculates the checksum of the .text and .rdata sections of a module
- *
- * This function computes the checksum of a given
- * module, in its .text and .rdata sections
- *
- * @param hMod The module's base/start address in memory
- * 
- * @return The sum of all bytes in the .text and .rdata sections
- *
- * @details N/A
- *
- *  @example DRM.cpp
- *
- * @usage
- * uint64_t result = Integrity::CalculateChecksum(GetModuleHandleA(NULL));
- */
-//const uint64_t Integrity::CalculateChecksum(HMODULE hMod)
-//{
-//	if (hMod == NULL)
-//		return 0;
-//
-//	uint64_t checksum = 0;
-//
-//	PIMAGE_DOS_HEADER pDoH = (PIMAGE_DOS_HEADER)(hMod);
-//	PIMAGE_NT_HEADERS64 pNtH;
-//
-//	if (pDoH == NULL)
-//	{
-//#ifdef LOGGING_ENABLED
-//		Logger::logf(Err, " PIMAGE_DOS_HEADER was NULL at Integrity::CalculateChecksum\n");
-//#endif
-//		return 0;
-//	}
-//
-//	pNtH = (PIMAGE_NT_HEADERS64)((PIMAGE_NT_HEADERS64)((PBYTE)hMod + (DWORD)pDoH->e_lfanew));
-//
-//	if (pNtH == NULL)
-//	{
-//#ifdef LOGGING_ENABLED
-//		Logger::logf(Err, " PIMAGE_NT_HEADERS64 was NULL at Integrity::CalculateChecksum\n");
-//#endif
-//		return 0;
-//	}
-//
-//	PIMAGE_SECTION_HEADER sectionHeader = IMAGE_FIRST_SECTION(pNtH);
-//
-//	int nSections = pNtH->FileHeader.NumberOfSections;
-//
-//	for (int i = 0; i < nSections; i++)
-//	{
-//		std::string sectionName(reinterpret_cast<const char*>(sectionHeader[i].Name));
-//
-//		if (sectionName == ".text" || sectionName == ".rdata")
-//		{
-//			if (sectionHeader[i].SizeOfRawData > 0)
-//			{
-//				uint64_t sectionChecksum = 0;
-//
-//				for (DWORD j = 0; j < sectionHeader[i].Misc.VirtualSize; j++)
-//				{
-//					sectionChecksum += (uint8_t)(hMod + sectionHeader[i].VirtualAddress + j);
-//				}
-//
-//				checksum += sectionChecksum;
-//			}
-//		}	
-//	}
-//
-//	return checksum;
-//}
 
 /**
  * @brief Calculates the checksum of the .text and .rdata sections of a module
@@ -90,10 +19,9 @@
  * @usage
  * bool isModified = Integrity::CompareChecksum(GetModuleHandleA(NULL), previous_checksum);
  */
-bool Integrity::CompareChecksum(__in const HMODULE hMod, __in const char* section, __in const uint64_t checksum)
+bool Integrity::CompareChecksum(__in const std::string module, __in const char* section, __in const uintptr_t checksum)
 {
-	uint64_t calculatedChecksum = CalculateChecksumFromSection(hMod, section);
-	return (calculatedChecksum == checksum);
+	return (CalculateChecksumFromSection(module, section) == checksum);
 }
 
 /**
@@ -117,7 +45,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 {
 	if (classThisPtr == nullptr)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logfw(Err, L"PeriodicIntegrityCheck called with null class Ptr");
 #endif
 		throw std::runtime_error("PeriodicIntegrityCheck called with null class Ptr");
@@ -132,57 +60,69 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 
 	std::string processName = Utility::ConvertWStringToString(Process::GetProcessName(GetCurrentProcessId()));
 
+	HMODULE currentModule = GetModuleHandleA(processName.c_str());
+
+	if (currentModule == NULL)
+	{
+#ifdef _LOGGING_ENABLED
+			Logger::logfw(Err, L"Failed to get module handle for %s in PeriodicIntegrityCheck", processName.c_str());
+#endif
+			throw std::runtime_error("Failed to get module handle for current process in PeriodicIntegrityCheck");
+	}
+
 	while (checking)
 	{
-		uint64_t checksum_main = 0;
-		uint64_t prev_checksum = 0;
+		printf("Performing integrity checks on loaded modules...\n");
 
-		if (counter % 2 == 0)
-		{
-		    checksum_main = Integrity::CalculateChecksumFromSection(GetModuleHandle(NULL), ".text");
-		    prev_checksum = integrity->RetrieveModuleChecksum(GetModuleHandle(NULL), ".text"); //fetch checksum gathered at program startup
-		}
-		else
-		{
-			checksum_main = Integrity::CalculateChecksumFromSection(GetModuleHandle(NULL), ".rdata");
-			prev_checksum = integrity->RetrieveModuleChecksum(GetModuleHandle(NULL), ".rdata");
-		}
+		uintptr_t checksum_main = 0;
+		uintptr_t prev_checksum = 0;
 
-		if (checksum_main != prev_checksum && prev_checksum != 0)
+		prev_checksum = integrity->RetrieveModuleChecksum(currentModule, (counter % 2 == 0 ? ".text" : ".rdata"));
+
+		if (!CompareChecksum(processName, (counter % 2 == 0 ? ".text" : ".rdata"), prev_checksum))
 		{
-			//optionally, log to a remote server
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logfw(Detection, L"Checksum for %s is different, tampering detected", (counter % 2 == 0 ? L".text" : L".rdata"));
 #endif
-			throw std::runtime_error("Integrity check failed: main module checksum mismatch");
+			throw std::runtime_error("Integrity check failed: section checksum mismatch");
 		}
-
+		
 		std::wstring fullProcessPath = Services::GetProcessDirectoryW(GetCurrentProcessId());
 		fullProcessPath += Process::GetProcessName(GetCurrentProcessId());
 
-		uint64_t diskFileChecksum = GetSectionChecksumFromDisc(fullProcessPath, (counter % 2 == 0 ? ".text" : ".rdata"));
+		uintptr_t diskFileChecksum = GetSectionChecksumFromDisc(fullProcessPath, (counter % 2 == 0 ? ".text" : ".rdata"));
 
 		if (diskFileChecksum != prev_checksum)
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logfw(Detection, L"Checksum for %s on disk is different, tampering detected", (counter % 2 == 0 ? L".text" : L".rdata"));
 #endif
 			throw std::runtime_error("Integrity check failed: disk file checksum mismatch");
 		}
 
 #ifndef _DEBUG
-		uint64_t writablePageInText = FindWritableAddress(processName, ".text");
-		uint64_t writablePageInRData = FindWritableAddress(processName, ".rdata");
-
-		if (writablePageInText != 0 || writablePageInRData != 0)
+		if (FindWritableAddress(processName, ".text") != 0 || FindWritableAddress(processName, ".rdata") != 0)
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logfw(Detection, L".text or .rdata section had writable page - someone has remapped sections!");
 #endif
 			//optionally, log to a remote server
 			throw std::runtime_error("Integrity check failed: .text page protection mismatch");
 		}	
 #endif
+
+		for (const auto& mod : integrity->ModuleChecksums)
+		{
+			if (!CompareChecksum(Utility::ConvertWStringToString(mod.Name), ".text", mod.SectionChecksums.at(".text")))
+			{
+#ifdef _LOGGING_ENABLED
+				Logger::logfw(Detection, L"Checksum for module %s at section %s is different, tampering detected", mod.Name.c_str(), L".text");
+#endif
+				throw std::runtime_error("Integrity check failed: section checksum mismatch");
+			}
+		}
+
+		printf("Integrity checks passed: no issues found\n");
 
 		this_thread::sleep_for(std::chrono::seconds(10));
 		counter += 1;
@@ -197,18 +137,18 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
  * 
  * @param `sectionName`  name of the section to read (e.g., ".text")
  * 
- * @return uint64_t checksum representing the .text section of the file
+ * @return uintptr_t checksum representing the .text section of the file
  * 
  * @details This function reads the specified section from a PE file on disk and computes its hash.
  */
-uint64_t Integrity::GetSectionChecksumFromDisc(__in const std::wstring path, __in const char* sectionName)
+uintptr_t Integrity::GetSectionChecksumFromDisc(__in const std::wstring path, __in const char* sectionName)
 {
 	std::vector<uint8_t> sectionBytes;
 
 	std::ifstream file(path, std::ios::binary);
 	if (!file)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logfw(Detection, L"Error reading file: %s @ GetSectionHashFromDisc", path.c_str());
 #endif
 		return 0;
@@ -219,7 +159,7 @@ uint64_t Integrity::GetSectionChecksumFromDisc(__in const std::wstring path, __i
 
 	if (dosHeader.e_magic != IMAGE_DOS_SIGNATURE)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logfw(Detection, L"Lacking MZ signature in file: %s @ GetSectionHashFromDisc", path.c_str());
 #endif
 		return 0;
@@ -230,7 +170,7 @@ uint64_t Integrity::GetSectionChecksumFromDisc(__in const std::wstring path, __i
 	file.read(reinterpret_cast<char*>(&ntHeaders), sizeof(IMAGE_NT_HEADERS));
 	if (ntHeaders.Signature != IMAGE_NT_SIGNATURE)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logfw(Detection, L"Invalid PE signature in file: %s @ GetSectionHashFromDisc", path.c_str());
 #endif
 		return 0;
@@ -251,7 +191,7 @@ uint64_t Integrity::GetSectionChecksumFromDisc(__in const std::wstring path, __i
 
 	if (!found)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logfw(Detection, L"section not found in file: %s @ GetSectionHashFromDisc", path.c_str());
 #endif
 		return 0;
@@ -270,13 +210,13 @@ uint64_t Integrity::GetSectionChecksumFromDisc(__in const std::wstring path, __i
 
 	if (!hMod)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logfw(Detection, L"Failed to get module handle for %s @ GetSectionChecksumFromDisc", processName.c_str());
 #endif
 		return 0;
 	}
 
-	uint64_t sectionChecksum = CalculateChecksumFromSection(hMod, sectionName);
+	uintptr_t sectionChecksum = CalculateChecksumFromSection(Utility::ConvertWStringToString(processName), sectionName);
 
 	if (sectionMemory != nullptr)
 		delete[] sectionMemory;
@@ -297,16 +237,26 @@ uint64_t Integrity::GetSectionChecksumFromDisc(__in const std::wstring path, __i
  * @details N/A
  *
  * @usage
- * const uint64_t result = Integrity::CalculateChecksumFromSection(GetModuleHandleA(NULL), ".text");
+ * const uintptr_t result = Integrity::CalculateChecksumFromSection(GetModuleHandleA(NULL), ".text");
  */
- uint64_t Integrity::CalculateChecksumFromSection(HMODULE hMod, const char* sectionName)
+uintptr_t Integrity::CalculateChecksumFromSection(const std::string module, const char* sectionName)
 {
-	if (hMod == NULL || sectionName == nullptr)
+	if (module.empty() || sectionName == nullptr)
 		return 0;
 
-	uint64_t checksum = 0;
+	uintptr_t checksum = 0;
 
-	auto SectionList = Process::GetSections(Utility::ConvertWStringToString(Process::GetProcessName(GetCurrentProcessId())));
+	HMODULE hMod = GetModuleHandleA(module.c_str());
+
+	if (hMod == NULL)
+	{
+#ifdef _LOGGING_ENABLED
+			Logger::logfw(Err, L"Failed to get module handle for %s @ Integrity::CalculateChecksumFromSection", module.c_str());
+#endif
+			return 0;
+	}
+
+	auto SectionList = Process::GetSections(module);
 	
 	for (auto section : SectionList)
 	{
@@ -314,9 +264,9 @@ uint64_t Integrity::GetSectionChecksumFromDisc(__in const std::wstring path, __i
 		{
 			if (section.size > 0)
 			{
-				uint64_t sectionChecksum = 0;
+				uintptr_t sectionChecksum = 0;
 
-				uint64_t sectionAddr = (uint64_t)(section.address) + (uint64_t)hMod;
+				uintptr_t sectionAddr = (uintptr_t)(section.address) + (uintptr_t)hMod;
 
 				for (DWORD j = 0; j < section.size; j++)				
 					checksum += *(uint8_t*)(sectionAddr + j);
@@ -346,13 +296,13 @@ uint64_t Integrity::GetSectionChecksumFromDisc(__in const std::wstring path, __i
  * @usage
  * bool isValid = Integrity::CheckLoadedModuleHashVersusDiskHash(hMod, ".text", L"C:\\path\\to\\file.exe");
  */
-bool Integrity::CheckLoadedModuleHashVersusDiskHash(__in const HMODULE hMod, __in const char* sectionName, __in std::wstring diskFilePath)
+bool Integrity::CheckLoadedModuleHashVersusDiskHash(__in const std::string module, __in const char* sectionName, __in std::wstring diskFilePath)
 {
-	if (hMod == NULL || sectionName == nullptr || diskFilePath.empty())
+	if (module.empty() || sectionName == nullptr || diskFilePath.empty())
 		return false;
 
-	uint64_t diskFileSectionChecksum = GetSectionChecksumFromDisc(diskFilePath, sectionName);
-	uint64_t loadedModuleSectionChecksum = CalculateChecksumFromSection(hMod, sectionName);
+	uintptr_t diskFileSectionChecksum = GetSectionChecksumFromDisc(diskFilePath, sectionName);
+	uintptr_t loadedModuleSectionChecksum = CalculateChecksumFromSection(module, sectionName);
 
 	return (diskFileSectionChecksum == loadedModuleSectionChecksum);
 }
@@ -370,9 +320,9 @@ bool Integrity::CheckLoadedModuleHashVersusDiskHash(__in const HMODULE hMod, __i
  * @details N/A
  *
  * @usage
- * uint64_t writableAddress = Integrity::FindWritableAddress("myModule.dll", ".rdata");
+ * uintptr_t writableAddress = Integrity::FindWritableAddress("myModule.dll", ".rdata");
  */
-uint64_t Integrity::FindWritableAddress(__in const std::string moduleName, __in const std::string sectionName)
+uintptr_t Integrity::FindWritableAddress(__in const std::string moduleName, __in const std::string sectionName)
 {
 	if (moduleName.empty() || sectionName.empty())
 	{
@@ -383,37 +333,47 @@ uint64_t Integrity::FindWritableAddress(__in const std::string moduleName, __in 
 
 	if (hMod == NULL)
 	{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 		Logger::logfw(Err, L"Failed to get module handle for %s @ Integrity::FindWritableAddress", moduleName.c_str());
 #endif
 		return 0;
 	}
 
-	const uint64_t sectionAddr = Process::GetSectionAddress(hMod, sectionName.c_str());
+	const uintptr_t sectionAddr = Process::GetSectionAddress(hMod, sectionName.c_str());
 	MEMORY_BASIC_INFORMATION mbi = { 0 };
 	SIZE_T result = 0;
-	uint64_t currentPageAddress = sectionAddr;
+	uintptr_t currentPageAddress = sectionAddr;
 
 	const int pageSize = 0x1000;
 
 	if (sectionAddr == NULL)
 	{
-#ifdef LOGGING_ENABLED
-		Logger::logf(Err, "textAddr was NULL @ Integrity::FindWritableAddress");
+#ifdef _LOGGING_ENABLED
+		Logger::logf(Err, "section address was NULL @ Integrity::FindWritableAddress");
 #endif
 		return 0;
 	}
 
-	uint64_t max_addr = sectionAddr + Process::GetSectionSize(hMod, sectionName);
+	uintptr_t max_addr = sectionAddr + Process::GetSectionSize(hMod, sectionName);
 
 	while ((result = VirtualQuery((LPCVOID)currentPageAddress, &mbi, sizeof(mbi))) != 0)     //Loop through all pages in .text
 	{
 		if (currentPageAddress >= max_addr)
 			break;
 
-		if (mbi.Protect != PAGE_EXECUTE_READ) //check if its not RX protections
+		if (sectionName == ".text")
 		{
-			return currentPageAddress;
+			if (mbi.Protect != PAGE_EXECUTE_READ)
+			{
+				return currentPageAddress;
+			}
+		}
+		else if (sectionName == ".rdata")
+		{
+			if (mbi.Protect != PAGE_READONLY)
+			{
+				return currentPageAddress;
+			}
 		}
 
 		currentPageAddress += pageSize;

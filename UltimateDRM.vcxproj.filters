@@ -31,9 +31,6 @@
     <ClCompile Include="src\UltimateDRM.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Logger.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\remap.cpp">
       <Filter>src</Filter>
     </ClCompile>

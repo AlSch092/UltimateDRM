@@ -36,7 +36,7 @@ namespace ProcessData
 	struct MODULE_DATA
 	{
 		wstring baseName;
-		wstring name;
+		wstring nameWithPath;
 		MODULEINFO dllInfo;
 		HMODULE hModule;
 	};
@@ -82,7 +82,7 @@ public:
 		
 		if (!FillModuleList())
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logf(Err, "Unable to traverse loaded modules @ Process::Process()");
 #endif
 		}
@@ -96,7 +96,7 @@ public:
 		}
 		else
 		{
-#ifdef LOGGING_ENABLED
+#ifdef _LOGGING_ENABLED
 			Logger::logf(Warning, "Could not fetch parent process ID @ Process::Process");
 #endif
 		}
