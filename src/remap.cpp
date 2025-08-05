@@ -129,13 +129,16 @@ RmpRemapImage(
     REMAP_ROUTINE fpRemapRoutine = NULL;
     BOOL status = TRUE;
 
+#ifdef _LOGGING_ENABLED
     Logger::logf(Info, "Remapping image at 0x%IX\n", ImageBase);
+#endif
 
     pNtHeaders = RtlImageNtHeader((PVOID)ImageBase);
     if (!pNtHeaders)
     {
-        Logger::logf(Err, "RtlImageNtHeader failed. (BaseAddress = 0x%IX)\n",
-            ImageBase);
+#ifdef _LOGGING_ENABLED
+        Logger::logf(Err, "RtlImageNtHeader failed. (BaseAddress = 0x%IX)\n",ImageBase);
+#endif
         status = FALSE;
         goto exit;
     }
@@ -143,7 +146,9 @@ RmpRemapImage(
     status = RmppVerifyPeSectionAlignment(pNtHeaders);
     if (!status)
     {
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err ,"RmppVerifyPeSectionAlignment failed.\n");
+#endif
         goto exit;
     }
 
@@ -156,14 +161,14 @@ RmpRemapImage(
         PAGE_EXECUTE_READWRITE);
     if (!pRemapRegion)
     {
+#ifdef _LOGGING_ENABLED
         Logger::logf(Err, "VirtualAlloc failed: %u\n", GetLastError());
+#endif
         status = FALSE;
         goto exit;
     }
 
-    //
     // Copy the image to the remap region.
-    //
     RmppCopyPeSections(pNtHeaders, (ULONG_PTR)pRemapRegion);
 
     //
@@ -174,15 +179,20 @@ RmpRemapImage(
         (ULONG_PTR)RmppRemapImageRoutine -
         ImageBase); 
 
+    MessageBoxA(0, "1", 0, 0);
+
     //
     // Invoke the remap routine inside the remap region.
     //
     status = fpRemapRoutine(pRemapRegion);
     if (!status)
     {
-        Logger::logf(Err,"RmppRemapImageRoutine failed.\n");
+#ifdef _LOGGING_ENABLED
+        Logger::logf(Err,"RmppRemapImageRoutine failed.");
+#endif
         goto exit;
     }
+    MessageBoxA(0, "2", 0, 0);
 
     //
     // Verify that each pe section in the remapped image is protected.
@@ -190,7 +200,9 @@ RmpRemapImage(
     status = RmppValidateRemappedImageProtection(ImageBase);
     if (!status)
     {
-        Logger::logf(Err, "RmppValidateRemappedImageProtection failed.\n");
+#ifdef _LOGGING_ENABLED
+        Logger::logf(Err, "RmppValidateRemappedImageProtection failed.");
+#endif
         goto exit;
     }
 
@@ -199,7 +211,9 @@ exit:
     {
         if (!VirtualFree(pRemapRegion, 0, MEM_RELEASE))
         {
-            Logger::logf(Err, "VirtualFree failed: %u\n", GetLastError());
+#ifdef _LOGGING_ENABLED
+            Logger::logf(Err, "VirtualFree failed: %u", GetLastError());
+#endif
         }
     }
 

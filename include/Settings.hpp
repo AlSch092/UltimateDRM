@@ -1,4 +1,4 @@
-//By AlSch092 @ Github, part of UltimateAntiCheat project
+//By AlSch092 @ Github, part of UltimateDRM project
 #pragma once
 
 #include <list>
@@ -10,6 +10,7 @@ class Settings final
 public:
 
 	static Settings* CreateInstance(
+		const std::string LicenseServerEndpoint,
 		const bool bAllowOfflineUsage,
 		const bool bUsingLicensing,
 		const bool bRequireCodeSigning,
@@ -20,13 +21,13 @@ public:
 		const bool bCheckIntegrity,
 		const bool bCheckHypervisor,
 		const bool bRequireRunAsAdministrator,
-		const bool bUsingDriver,
 		const std::list<std::wstring> allowedParents
 	)
 	{
 		if (!Instance)
 		{
 			Instance = new Settings(
+				LicenseServerEndpoint,
 				bAllowOfflineUsage,
 				bUsingLicensing,
 				bRequireCodeSigning,
@@ -46,7 +47,8 @@ public:
 
 	Settings(const Settings&) = delete; //prevent copying
 	Settings& operator=(const Settings&) = delete;
-
+	
+	std::string LicenseServerEndpoint;
 	bool bAllowOfflineUsage;
 	bool bRequireCodeSigning;
 	bool bEnforceSecureBoot;
@@ -62,6 +64,7 @@ public:
 	std::list<std::wstring> allowedParents;
 
 	Settings(
+		const std::string LicenseServerEndpoint,
 		const bool bAllowOfflineUsage,
 		const bool bUsingLicensing,
 		const bool bRequireCodeSigning,
@@ -73,7 +76,7 @@ public:
 		const bool bCheckHypervisor,
 		const bool bRequireRunAsAdministrator,
 		const std::list<std::wstring> allowedParents)
-		: bAllowOfflineUsage(bAllowOfflineUsage), bUsingLicensing(bUsingLicensing), bRequireCodeSigning(bRequireCodeSigning), bEnforceSecureBoot(bEnforceSecureBoot), bEnforceDSE(bEnforceDSE), bEnforceNoKDbg(bEnforceNoKDbg), bUseAntiDebugging(bUseAntiDebugging), bCheckIntegrity(bCheckIntegrity), bCheckHypervisor(bCheckHypervisor), bRequireRunAsAdministrator(bRequireRunAsAdministrator), allowedParents(allowedParents)
+		: LicenseServerEndpoint(LicenseServerEndpoint), bAllowOfflineUsage(bAllowOfflineUsage), bUsingLicensing(bUsingLicensing), bRequireCodeSigning(bRequireCodeSigning), bEnforceSecureBoot(bEnforceSecureBoot), bEnforceDSE(bEnforceDSE), bEnforceNoKDbg(bEnforceNoKDbg), bUseAntiDebugging(bUseAntiDebugging), bCheckIntegrity(bCheckIntegrity), bCheckHypervisor(bCheckHypervisor), bRequireRunAsAdministrator(bRequireRunAsAdministrator), allowedParents(allowedParents)
 	{
 		if (Instance != nullptr) //since we can't use a private constructor with ProtectedMemory class, we need to check if the instance is already created
 		{

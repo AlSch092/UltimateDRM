@@ -8,6 +8,7 @@ struct ModuleChecksumData
 {
 	HMODULE hMod;
 	std::wstring Name;
+	std::wstring Path;
 	unordered_map<std::string, uintptr_t> SectionChecksums; //stores checksums for each section in the module
 };
 
@@ -57,11 +58,12 @@ public:
 	Integrity operator/(Integrity& other) = delete;
 
 	static uintptr_t FindWritableAddress(__in const std::string moduleName, __in const std::string sectionName);
+	static bool IsReturnAddressInModule(__in const uintptr_t RetAddr, __in const wchar_t* module);
 
 	static uintptr_t CalculateChecksumFromSection(const std::string module, const char* sectionName);
 
 	static bool CompareChecksum(__in const std::string module, __in const char* section, __in const uintptr_t previous_checksum);
-	static bool CompareChecksumToFileOnDisc(__in const std::string module, __in const char* section, __in const uintptr_t previous_checksum);
+	static bool CompareChecksumToFileOnDisc(__in const std::wstring& module, __in const char* section, __in const uintptr_t previous_checksum);
 
 	static uintptr_t GetSectionChecksumFromDisc(__in const std::wstring path, __in const char* sectionName);
 

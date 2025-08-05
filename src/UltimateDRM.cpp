@@ -28,13 +28,13 @@ const
 PIMAGE_TLS_CALLBACK _tls_callback = TLSCallback;
 #pragma data_seg ()
 #pragma const_seg ()
-#endif
-
+#else
 #pragma comment(linker, "/INCLUDE:__tls_used")
 #pragma comment(linker, "/INCLUDE:_tls_callback")
 #pragma data_seg(push, old, ".CRT$XLB")
 EXTERN_C __declspec(allocate(".CRT$XLB"))  PIMAGE_TLS_CALLBACK tls_callback = TLSCallback;
 #pragma data_seg(pop, old)
+#endif
 
 Settings* Settings::Instance = nullptr; //singleton static instance decl to avoid compilation errors
 
@@ -72,6 +72,7 @@ struct DRM::Impl
 		const bool bRequireRunAsAdministrator = false;
 
 		Settings::Instance = this->ProtectedSettings->Construct<Settings>(
+			LicenseServerEndpoint,
 			bAllowOfflineUsage,
 			bUsingLicensing,
 			bRequireCodeSigning,
@@ -233,30 +234,32 @@ bool DRM::Protect()
 	if (Settings::Instance->bCheckIntegrity)
 	{
 #ifdef _M_X64
-#ifndef _DEBUG
-		if (!RmpRemapImage((ULONG_PTR)GetModuleHandle(NULL))) //possibly  causes Defender false positive? Debug compilation does not throw false positive, where this is excluded
-		{
-			throw std::runtime_error("Failed to remap program sections");
-		}
+#ifdef _STATIC_LIB //if this lib is used in a .DLL to remap a host process (.exe) module, it will crash. need to debug it further (still works to compile this .lib into a .exe and remap)
+#ifndef _DEBUG  //todo: check if currently in .dll or .lib linked
+		//if (!RmpRemapImage((ULONG_PTR)GetModuleHandleA(NULL))) //possibly  causes Defender false positive? Debug compilation does not throw false positive, where this is excluded
+		//{
+		//	throw std::runtime_error("Failed to remap program sections");
+		//}
+#endif
 #endif
 #endif
 		auto ModuleList = Process::GetLoadedModules();
 
-		for (auto module : ModuleList) //store hashes of all loaded modules
+		for (auto module : ModuleList) //store hashes of all loaded modules for all non-writable sections
 		{
-			uintptr_t moduleTextChecksum = Integrity::CalculateChecksumFromSection(Utility::ConvertWStringToString(module.baseName), ".text");
-			//uintptr_t moduleRDataChecksum = Integrity::CalculateChecksumFromSection(Utility::ConvertWStringToString(module.baseName), (Has_mrdata_section ? ".mrdata" : ".rdata"));
-			
-			if (moduleTextChecksum == 0) //|| moduleRDataChecksum == 0)
-			{
-				throw std::runtime_error("Failed to calculate module's checksums");
-			}
-
 			ModuleChecksumData moduleChecksum;
 			moduleChecksum.hMod = module.hModule;
 			moduleChecksum.Name = module.baseName;
-			moduleChecksum.SectionChecksums[".text"] = moduleTextChecksum;
-			//moduleChecksum.SectionChecksums[(Has_mrdata_section ? ".mrdata" : ".rdata")] = moduleRDataChecksum;
+			moduleChecksum.Path = module.nameWithPath;
+
+			auto nonWritableSections = Process::FindNonWritableSections(Utility::ConvertWStringToString(module.baseName)); //.rdata is not a 'guaranteed' section name, especially on WoW64
+
+			for (const auto& section : nonWritableSections)
+			{
+				uintptr_t checksum = Integrity::CalculateChecksumFromSection(Utility::ConvertWStringToString(module.baseName), section.name.c_str());
+				moduleChecksum.SectionChecksums[section.name.c_str()] = checksum;
+				printf("Section %s checksum: %llx\n", section.name.c_str(), checksum);
+			}
 
 			this->pImpl->IntegrityChecker->StoreModuleChecksum(moduleChecksum); //tested and working fine
 		}		

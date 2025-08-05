@@ -43,13 +43,10 @@ bool Integrity::CompareChecksum(__in const std::string module, __in const char* 
  * @usage
  * bool isModified = Integrity::CompareChecksumToFileOnDisc("DRMTest.exe", ".text", 12345678);
  */
-bool Integrity::CompareChecksumToFileOnDisc(__in const std::string module, __in const char* section, __in const uintptr_t loadedImageChecksum)
+bool Integrity::CompareChecksumToFileOnDisc(__in const std::wstring& filePath, __in const char* section, __in const uintptr_t loadedImageChecksum)
 {
-	std::wstring fullProcessPath = Services::GetProcessDirectoryW(GetCurrentProcessId());
-	fullProcessPath += Process::GetProcessName(GetCurrentProcessId());
-
 	//check checksum of module's file on disc vs. loaded image
-	uintptr_t diskFileChecksum = GetSectionChecksumFromDisc(fullProcessPath, section);
+	uintptr_t diskFileChecksum = GetSectionChecksumFromDisc(filePath, section);
 	return (diskFileChecksum == loadedImageChecksum);
 }
 
@@ -86,7 +83,6 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 	Integrity* integrity = reinterpret_cast<Integrity*>(classThisPtr);
 
 	bool checking = true;
-	int counter = 0;
 
 	std::string processName = Utility::ConvertWStringToString(Process::GetProcessName(GetCurrentProcessId()));
 
@@ -105,57 +101,57 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 		uintptr_t checksum_main = 0;
 		uintptr_t prev_checksum = 0;
 
-		prev_checksum = integrity->RetrieveModuleChecksum(currentModule, ".text");
-
-		//check .text and read-only sections of loaded main module vs. what was gathered at startup (read-only data sections on WoW64 can change name alot per each module)
-		if (!CompareChecksum(processName, ".text", prev_checksum))
-		{
-#ifdef _LOGGING_ENABLED
-			Logger::logf(Detection, "Checksum for .text is different, tampering detected");
-#endif
-			throw std::runtime_error("Integrity check failed: section checksum mismatch");
-		}
-		
-		if(!CompareChecksumToFileOnDisc(processName, ".text", CalculateChecksumFromSection(processName, ".text")))
-		{
-#ifdef _LOGGING_ENABLED
-			Logger::logf(Detection, "Checksum for .text on disk is different, tampering detected");
-#endif
-			throw std::runtime_error("Integrity check failed: disk file checksum mismatch");
-		}
-
-#ifndef _DEBUG
-		if (FindWritableAddress(processName, ".text") != 0 || FindWritableAddress(processName, ".rdata") != 0) //check if any page is writable inside .text|.rdata
-		{
-#ifdef _LOGGING_ENABLED
-			Logger::logf(Detection, ".text or .rdata section had writable page - someone has remapped sections!");
-#endif
-			//optionally, log to a remote server
-			throw std::runtime_error("Integrity check failed: read-only section has writable page(s)");
-		}	
-#endif
-
 		for (const auto& mod : integrity->ModuleChecksums) //check checksums of all loaded modules vs. what was gathered at startup
 		{
-			if (!CompareChecksum(Utility::ConvertWStringToString(mod.Name), ".text", mod.SectionChecksums.at(".text")))
-			{
-#ifdef _LOGGING_ENABLED
-				Logger::logfw(Detection, L"Checksum for module %s at section %s is different, tampering detected", mod.Name.c_str(), L".text");
-#endif
-				throw std::runtime_error("Integrity check failed: section checksum mismatch");
-			}
-//			else if (!CompareChecksum(Utility::ConvertWStringToString(mod.Name), (bHas_mrdata_section ? ".mrdata" : ".rdata"), mod.SectionChecksums.at((bHas_mrdata_section ? ".mrdata" : ".rdata"))))
-//			{
-//#ifdef _LOGGING_ENABLED
-//				Logger::logfw(Detection, L"Checksum for module %s at section %s is different, tampering detected", mod.Name.c_str(), L".rdata");
-//#endif
-//				throw std::runtime_error("Integrity check failed: section checksum mismatch");
-//			}
+			auto nonWritableSections = Process::FindNonWritableSections(Utility::ConvertWStringToString(mod.Name)); //.rdata is not a 'guaranteed' section name, especially on WoW64
 
+			//get full module path for comparison vs disc
+
+			for (const auto& section : nonWritableSections)
+			{
+				HMODULE hMod = GetModuleHandleW(mod.Name.c_str());
+
+				if (hMod == NULL) //this shouldn't happen unless possibly a module is unloaded 
+				{
+#ifdef _LOGGING_ENABLED
+					Logger::logfw(Warning, L"Module %s was no longer found @ PeriodicIntegrityCheck", mod.Name.c_str());
+#endif
+					continue;
+				}
+
+				prev_checksum = integrity->RetrieveModuleChecksum(hMod, section.name.c_str()); //fetch old, don't calculate 
+
+				if (!CompareChecksum(Utility::ConvertWStringToString(mod.Name), section.name.c_str(), prev_checksum))
+				{
+#ifdef _LOGGING_ENABLED
+					Logger::logf(Detection, "Checksum for .text is different, tampering detected");
+#endif
+
+					throw std::runtime_error("Integrity check failed: section checksum mismatch");
+				}
+
+				if (!CompareChecksumToFileOnDisc(mod.Path, section.name.c_str(), CalculateChecksumFromSection(Utility::ConvertWStringToString(mod.Name), section.name.c_str())))
+				{
+#ifdef _LOGGING_ENABLED
+					Logger::logf(Detection, "Checksum for .text on disk is different, tampering detected");
+#endif
+					throw std::runtime_error("Integrity check failed: disk file checksum mismatch");
+				}
+
+#ifndef _DEBUG
+				if (FindWritableAddress(Utility::ConvertWStringToString(mod.Name), section.name.c_str()) != 0) //check if any page is writable inside .text|.rdata
+				{
+#ifdef _LOGGING_ENABLED
+					Logger::logf(Detection, "non-writable section %s had writable page", section.name.c_str());
+#endif
+					//optionally, log to a remote server
+					throw std::runtime_error("Integrity check failed: read-only section has writable page(s)");
+				}
+#endif
+			}		
 		}
 
-		this_thread::sleep_for(std::chrono::seconds(10));
-		counter += 1;
+		this_thread::sleep_for(std::chrono::seconds(5));
 	}
 }
 
@@ -410,4 +406,60 @@ uintptr_t Integrity::FindWritableAddress(__in const std::string moduleName, __in
 	}
 
 	return 0;
+}
+
+/**
+ * @brief Checks if an address `RetAddr` belongs to `module`'s .text section
+ *
+ *
+ * @param `RetAddr` Address to check
+ * @param `module` The name of the module to search in.
+ *
+ * @return True/False if `RetAddr` was located in `module`'s .text section
+ *
+ * @details  Passing a nullptr `module` results in `GetModuleHandleW(NULL)`, rather than an error
+ *
+ * @usage
+ * if(IsReturnAddressInModule(*(uintptr_t*)_AddressOfReturnAddress(), "mydll.dll"))
+ */
+bool Integrity::IsReturnAddressInModule(__in const uintptr_t RetAddr, __in const wchar_t* module)
+{
+	if (RetAddr == 0)
+	{
+#ifdef _LOGGING_ENABLED
+		Logger::logf(Err, "RetAddr was 0 @ : Integrity::IsReturnAddressInModule");
+#endif
+		return false;
+	}
+
+	HMODULE retBase = 0;
+
+	if (module == nullptr)
+	{
+		retBase = (HMODULE)GetModuleHandleW(NULL);
+	}
+	else
+	{
+		retBase = (HMODULE)GetModuleHandleW(module);
+	}
+
+	if (retBase == 0)
+	{
+#ifdef _LOGGING_ENABLED
+		Logger::logf(Err, "retBase was 0 @ : Integrity::IsReturnAddressInModule");
+#endif
+		return false;
+	}
+
+	DWORD size = Process::GetModuleSize(retBase);
+
+	if (size == 0)
+	{
+#ifdef _LOGGING_ENABLED
+		Logger::logf(Err, "size was 0 @ : Integrity::IsReturnAddressInModule");
+#endif
+		return false;
+	}
+
+	return (RetAddr >= (uintptr_t)retBase && RetAddr < ((uintptr_t)retBase + size)) ? true : false;
 }

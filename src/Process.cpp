@@ -799,8 +799,16 @@ HMODULE Process::GetRemoteModuleBaseAddress(__in const DWORD processId, __in con
     return hModule;
 }
 
-bool Process::GetProcessTextSection(__in const HANDLE hProcess, __out uintptr_t& baseAddress, __out SIZE_T& sectionSize)
+bool Process::GetProcessSection(__in const HANDLE hProcess, __in const char* sectionName, __out uintptr_t& baseAddress, __out SIZE_T& sectionSize)
 {
+    baseAddress = 0;
+    sectionSize = 0; //set later if function succeeds
+
+    if (hProcess == NULL || sectionName == nullptr)
+    {
+        return false;
+    }
+
     HMODULE hModule = nullptr;
     MODULEENTRY32 me32;
     me32.dwSize = sizeof(MODULEENTRY32);
@@ -842,7 +850,7 @@ bool Process::GetProcessTextSection(__in const HANDLE hProcess, __out uintptr_t&
         if (!ReadProcessMemory(hProcess, (LPCVOID)sectionOffset, &sectionHeader, sizeof(sectionHeader), &bytesRead) || bytesRead != sizeof(sectionHeader))
             return false;
 
-        if (memcmp(sectionHeader.Name, ".text", 5) == 0)
+        if (memcmp(sectionHeader.Name, sectionName, strlen(sectionName) + 1) == 0)
         {
             baseAddress = (uintptr_t)hModule + sectionHeader.VirtualAddress;
             sectionSize = sectionHeader.Misc.VirtualSize;
@@ -855,8 +863,10 @@ bool Process::GetProcessTextSection(__in const HANDLE hProcess, __out uintptr_t&
     return false;
 }
 
-
-std::vector<BYTE> Process::ReadRemoteTextSection(__in const DWORD pid)
+/*
+    ReadRemoteTextSection - Returns vector of bytes representing the memory of `sectionName` in running process `pid`
+*/
+std::vector<uint8_t> Process::ReadRemoteSection(__in const DWORD pid, __in const char* sectionName)
 {
 	if (pid <= 4) //system processes
         return {};
@@ -874,7 +884,7 @@ std::vector<BYTE> Process::ReadRemoteTextSection(__in const DWORD pid)
     uintptr_t baseAddress = 0;
     SIZE_T sectionSize = 0;
 
-    if (!GetProcessTextSection(hProcess, baseAddress, sectionSize)) 
+    if (!GetProcessSection(hProcess, sectionName, baseAddress, sectionSize)) 
     {
 #ifdef _LOGGING_ENABLED
         Logger::log(Err, "Failed to find the .text section.");
@@ -883,7 +893,7 @@ std::vector<BYTE> Process::ReadRemoteTextSection(__in const DWORD pid)
         return {};
     }
 
-    std::vector<BYTE> buffer(sectionSize);
+    std::vector<uint8_t> buffer(sectionSize);
 
     SIZE_T bytesRead = 0;
     if (!ReadProcessMemory(hProcess, reinterpret_cast<LPCVOID>(baseAddress), buffer.data(), sectionSize, &bytesRead)) 
@@ -899,4 +909,71 @@ std::vector<BYTE> Process::ReadRemoteTextSection(__in const DWORD pid)
     CloseHandle(hProcess);
 
     return buffer;
+}
+
+/*
+    FindNonWritableSections - Returns a list of non-writable sections in `module`
+*/
+std::list<ProcessData::Section> Process::FindNonWritableSections(__in const std::string module)
+{
+    if (module.empty())
+        return {};
+
+    std::list<ProcessData::Section> nonWritableSections;
+
+    HMODULE hModule = GetModuleHandleA(module.c_str());
+
+    if (hModule == NULL)
+    {
+#ifdef _LOGGING_ENABLED
+        Logger::logf(Err, "hModule was NULL @ FindNonWritableSections");
+#endif
+        return {};
+    }
+
+    PIMAGE_DOS_HEADER dosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(hModule);
+
+    if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE)
+    {
+#ifdef _LOGGING_ENABLED
+        Logger::logf(Err, "Invalid DOS header @ FindNonWritableSections");
+#endif
+        return {};
+    }
+
+    // Get NT headers
+    PIMAGE_NT_HEADERS ntHeader = reinterpret_cast<PIMAGE_NT_HEADERS>(
+        reinterpret_cast<BYTE*>(hModule) + dosHeader->e_lfanew);
+
+    if (ntHeader->Signature != IMAGE_NT_SIGNATURE)
+    {
+#ifdef _LOGGING_ENABLED
+        Logger::logf(Err, "Invalid NT header @ FindNonWritableSections");
+#endif
+        return {};
+    }
+
+    // Section headers start right after optional header
+    auto* section = IMAGE_FIRST_SECTION(ntHeader);
+
+    for (WORD i = 0; i < ntHeader->FileHeader.NumberOfSections; ++i, ++section)
+    {
+        std::string name(reinterpret_cast<char*>(section->Name),
+            strnlen_s(reinterpret_cast<char*>(section->Name), IMAGE_SIZEOF_SHORT_NAME));
+
+        DWORD characteristics = section->Characteristics;
+
+        bool writable = (characteristics & IMAGE_SCN_MEM_WRITE) != 0;
+
+        if (!writable)
+        {
+            ProcessData::Section s;
+            s.address = section->VirtualAddress;
+            s.size = section->Misc.VirtualSize;
+            s.name = reinterpret_cast<char*>(section->Name);
+            nonWritableSections.push_back(s);
+        }
+    }
+
+    return nonWritableSections;
 }

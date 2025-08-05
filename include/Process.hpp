@@ -155,8 +155,10 @@ public:
 
 	static HMODULE GetRemoteModuleBaseAddress(__in const DWORD processId, __in const  wchar_t* moduleName);
 
-	static bool GetProcessTextSection(__in const HANDLE hProcess, __out uintptr_t& baseAddress, __out SIZE_T& sectionSize);
-	static std::vector<uint8_t> ReadRemoteTextSection(__in const DWORD pid); //fetch .text of a running process (can improve this by making it any section instead of just .text)
+	static bool GetProcessSection(__in const HANDLE hProcess, __in const char* sectionName, __out uintptr_t& baseAddress, __out SIZE_T& sectionSize);
+	static std::vector<uint8_t> ReadRemoteSection(__in const DWORD pid, __in const char* sectionName); //fetch .text of a running process (can improve this by making it any section instead of just .text)
+
+	static std::list<ProcessData::Section> FindNonWritableSections(__in const std::string module);
 
 private:
 
