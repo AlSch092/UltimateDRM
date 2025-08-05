@@ -258,7 +258,10 @@ bool DRM::Protect()
 			{
 				uintptr_t checksum = Integrity::CalculateChecksumFromSection(Utility::ConvertWStringToString(module.baseName), section.name.c_str());
 				moduleChecksum.SectionChecksums[section.name.c_str()] = checksum;
-				printf("Section %s checksum: %llx\n", section.name.c_str(), checksum);
+
+#ifdef _LOGGING_ENABLED	
+				Logger::logf(Info, "Section %s checksum: %llx", section.name.c_str(), checksum);
+#endif
 			}
 
 			this->pImpl->IntegrityChecker->StoreModuleChecksum(moduleChecksum); //tested and working fine
