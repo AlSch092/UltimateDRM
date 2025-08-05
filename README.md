@@ -7,7 +7,7 @@
 
 DRM Library for Windows (x64) in C++  
 
-This project aims to take the good portions of the UltimateAnticheat project while improving aspects which were messy or implemented poorly, such as the integrity checker. An emphasis will be made on code readability, modularity, and reusability for the core aspects of this DRM. Anyone is free to contribute as long as PRs are quality and follow the same code style. The project is currently being supported for Visual Studio 17 (2022), CMake support will be added in the future.  
+This project aims to take the good portions of the UltimateAnticheat project while improving aspects which were messy or implemented poorly, such as the integrity checker. An emphasis will be made on code readability, modularity, and reusability for the core aspects of this DRM. Anyone is free to contribute as long as PRs are quality and follow the same code style. The project is currently being supported for Visual Studio 17 (2022), CMake support will be added in the future. I'm currently using this lib in a closed source AC/detection engine and it work great, while being low resource usage.
 
 ** This project was started on July 19, 2025, and might not have many files yet  
 ** There is no such thing as an 'uncrackable DRM' - any code or binaries run on a client machine can be tampered with enough effort  
