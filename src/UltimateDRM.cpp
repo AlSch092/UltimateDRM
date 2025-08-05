@@ -234,12 +234,12 @@ bool DRM::Protect()
 	if (Settings::Instance->bCheckIntegrity)
 	{
 #ifdef _M_X64
-#ifdef _STATIC_LIB //if this lib is used in a .DLL to remap a host process (.exe) module, it will crash. need to debug it further (still works to compile this .lib into a .exe and remap)
+#ifdef _TARGET_STATIC_LIB //if this lib is used in a .DLL to remap a host process (.exe) module, it will crash. need to debug it further (still works to compile this .lib into a .exe and remap)
 #ifndef _DEBUG  //todo: check if currently in .dll or .lib linked
-		//if (!RmpRemapImage((ULONG_PTR)GetModuleHandleA(NULL))) //possibly  causes Defender false positive? Debug compilation does not throw false positive, where this is excluded
-		//{
-		//	throw std::runtime_error("Failed to remap program sections");
-		//}
+		if (!RmpRemapImage((ULONG_PTR)GetModuleHandleA(NULL))) //possibly  causes Defender false positive? Debug compilation does not throw false positive, where this is excluded
+		{
+			throw std::runtime_error("Failed to remap program sections");
+		}
 #endif
 #endif
 #endif

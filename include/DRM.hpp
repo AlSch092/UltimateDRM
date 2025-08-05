@@ -1,4 +1,6 @@
 #pragma once
+#define _TARGET_STATIC_LIB //if you're building this .lib into a .DLL, comment this line and uncomment the below line
+//#define _TARGET_DYN_LIB
 #include "Settings.hpp"
 #include "DRMException.hpp"
   
