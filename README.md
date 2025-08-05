@@ -16,7 +16,7 @@ This project aims to take the good portions of the UltimateAnticheat project whi
 - Settings class which controls which types of DRM checks to occur, and resides in protected memory    
 - Memory protections/anti-tamper     
 - Licensing  (not yet finished)  
-- Periodic Integrity checks on sections of loaded modules  
+- Periodic Integrity checks on all non-writable sections of all loaded modules  
 - Blocks multiple client instances   
 - Checks for and blocks threads spawning on addresses outside of any loaded module (<Windows 10 only)  
 - Checks the parent process against a whitelist   
