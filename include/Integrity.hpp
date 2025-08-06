@@ -2,26 +2,58 @@
 #include <stdint.h>
 #include "Process.hpp"
 #include "Thread.hpp"
+#include "Settings.hpp"
+#include <mutex>
 #include <unordered_map>
 
+/**
+ * @brief IntegrityViolation structure tracks anomalies with module integrity
+ */
+struct IntegrityViolation
+{
+	std::wstring module;
+	std::wstring section;
+	std::wstring description;
+	uintptr_t address = 0;
+
+	bool operator==(const IntegrityViolation& other) const noexcept
+	{
+		return module == other.module && section == other.section && address == other.address;
+	}
+};
+
+/**
+ * @brief ModuleChecksumData holds information about the checksums of each section of a module
+ */
 struct ModuleChecksumData
 {
 	HMODULE hMod;
 	std::wstring Name;
 	std::wstring Path;
-	unordered_map<std::string, uintptr_t> SectionChecksums; //stores checksums for each section in the module
+	std::unordered_map<std::string, uintptr_t> SectionChecksums; //stores checksums for each section in the module
+
+	bool operator==(const ModuleChecksumData& other) const noexcept
+	{
+		return hMod == other.hMod && Name == other.Name && Path == other.Path;
+	}
 };
 
 /**
- * @brief    Class that deals with checksums and runtime integrity
- *
+ * @brief Class that deals with checksums and runtime integrity
+ * @details Tracks changes to unwritable sections of all loaded modules, along with checking for abnormal writable pages
+ * @details It also compares loaded modules to their files on disc
  */
 class Integrity final
 {
 public:
 
-	Integrity() 
+	Integrity(Settings* s) : Config(s)
 	{
+		if (s == nullptr)
+		{
+			throw std::runtime_error("Null pointer error");
+		}
+
 		try
 		{
 			PeriodicIntegrityCheckThread = std::make_unique<Thread>((LPTHREAD_START_ROUTINE)&PeriodicIntegrityCheck, (LPVOID)this, true, false);
@@ -91,6 +123,19 @@ public:
 		return it->SectionChecksums.at(std::string(section));
 	}
 
+	auto GetViolations() const 
+	{ 
+		std::lock_guard<std::mutex>  lock(ViolationsMutex);
+		return this->Violations; 
+	}
+
+	void AddViolation(const IntegrityViolation iv)
+	{
+		std::lock_guard<std::mutex>  lock(ViolationsMutex);
+		if (std::find(Violations.begin(), Violations.end(), iv) == Violations.end())
+			Violations.push_back(iv);
+	}
+
 private:
 
 	std::vector<ProcessData::MODULE_DATA> ModuleList;
@@ -100,4 +145,9 @@ private:
 	std::unique_ptr<Thread> PeriodicIntegrityCheckThread = nullptr; //thread for periodic integrity checks
 
 	static void PeriodicIntegrityCheck(LPVOID thisClassPtr); //performs periodic integrity checks on the process and its modules
+
+	Settings* Config = nullptr; //non-owning pointer; do not delete at class destruction. 
+
+	std::vector<IntegrityViolation> Violations;
+	mutable std::mutex ViolationsMutex;
 };

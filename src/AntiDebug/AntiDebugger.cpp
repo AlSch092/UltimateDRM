@@ -185,69 +185,6 @@ void Debugger::AntiDebug::_IsHardwareDebuggerPresent(LPVOID AD)
 }
 
 /*
-	PreventWindowsDebuggers - experimental, patches over some common debugging routines
-*/
-bool Debugger::AntiDebug::PreventWindowsDebuggers()
-{
-	HMODULE ntdll = GetModuleHandleA("ntdll.dll");
-
-	if (!ntdll)
-	{
-#ifdef _LOGGING_ENABLED
-		Logger::logf(Err, "Failed to find ntdll.dll @ AntiDebug::PreventWindowsDebuggers");
-#endif
-		return false;
-	}
-
-	DWORD dwOldProt = 0;
-
-	uintptr_t DbgBreakpoint_Address = (uintptr_t)GetProcAddress(ntdll, "DbgBreakPoint");
-	uintptr_t DbgUiRemoteBreakin_Address = (uintptr_t)GetProcAddress(ntdll, "DbgUiRemoteBreakin");
-
-	if (DbgBreakpoint_Address)
-	{
-		if (VirtualProtect((LPVOID)DbgBreakpoint_Address, 1, PAGE_EXECUTE_READWRITE, &dwOldProt))
-		{
-			__try
-			{
-				*(BYTE*)DbgBreakpoint_Address = 0xC3;
-			}
-			__except(EXCEPTION_EXECUTE_HANDLER)
-			{
-#ifdef _LOGGING_ENABLED
-				Logger::logf(Err, "Failed to patch over DbgBreakpoint @ AntiDebug::PreventWindowsDebuggers");
-#endif
-				return false;
-			}
-
-			VirtualProtect((LPVOID)DbgBreakpoint_Address, 1, dwOldProt, &dwOldProt);
-		}
-	}
-
-	if (DbgUiRemoteBreakin_Address)
-	{
-		if (VirtualProtect((LPVOID)DbgUiRemoteBreakin_Address, 1, PAGE_EXECUTE_READWRITE, &dwOldProt))
-		{
-			__try
-			{
-				*(BYTE*)DbgUiRemoteBreakin_Address = 0xC3;
-			}
-			__except (EXCEPTION_EXECUTE_HANDLER)
-			{
-#ifdef _LOGGING_ENABLED
-				Logger::logf(Err, "Failed to patch over DbgUiRemoteBreakin @ AntiDebug::PreventWindowsDebuggers");
-#endif
-				return false;
-			}
-
-			VirtualProtect((LPVOID)DbgUiRemoteBreakin_Address, 1, dwOldProt, &dwOldProt); //set back original protections
-		}
-	}
-
-	return true;
-}
-
-/*
 	HideThreadFromDebugger - hides `hThread` from windows debuggers by calling NtSetInformationThread
 	returns `true` on success
 */
@@ -256,7 +193,12 @@ bool Debugger::AntiDebug::HideThreadFromDebugger(HANDLE hThread)
 	typedef NTSTATUS(NTAPI* pNtSetInformationThread) (HANDLE, UINT, PVOID, ULONG);
 	NTSTATUS Status;
 
-	pNtSetInformationThread NtSetInformationThread = (pNtSetInformationThread)GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtSetInformationThread");
+	HMODULE hMod = GetModuleHandleA("ntdll.dll");
+
+	if (!hMod)
+		hMod = LoadLibraryA("ntdll.dll");
+
+	pNtSetInformationThread NtSetInformationThread = (pNtSetInformationThread)GetProcAddress(hMod, "NtSetInformationThread");
 
 	if (NtSetInformationThread == NULL)
 		return false;
@@ -272,4 +214,58 @@ bool Debugger::AntiDebug::HideThreadFromDebugger(HANDLE hThread)
 bool Debugger::AntiDebug::IsDBK64DriverLoaded()
 {
 	return Services::IsDriverRunning(this->DBK64Driver);
+}
+
+void Debugger::AntiDebug::HideAllThreadsFromDebugger()
+{
+	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+
+	if (hSnapshot == INVALID_HANDLE_VALUE)
+	{
+#ifdef _LOGGING_ENABLED
+		std::cerr << "Failed to create snapshot." << std::endl;
+#endif
+		return;
+	}
+
+	DWORD pid = GetCurrentProcessId();
+
+	THREADENTRY32 te;
+	te.dwSize = sizeof(THREADENTRY32);
+
+	if (Thread32First(hSnapshot, &te))
+	{
+		do
+		{
+			if (te.th32OwnerProcessID == pid)
+			{
+				HANDLE hThread = OpenThread(THREAD_SET_INFORMATION | THREAD_QUERY_INFORMATION, FALSE, te.th32ThreadID);
+
+				if (!hThread)
+				{
+#ifdef _LOGGING_ENABLED
+					std::cerr << "Failed to open thread: " << GetLastError() << std::endl;
+#endif
+					continue;
+				}
+
+				if (!Debugger::AntiDebug::HideThreadFromDebugger(hThread)) //hide thread from debuggers, placing this in the TLS callback allows all threads to be hidden
+				{
+#ifdef _LOGGING_ENABLED
+					Logger::logf(Warning, " Failed to hide thread from debugger @ TLSCallback: thread id %d\n", GetCurrentThreadId());
+#endif
+				}
+
+				CloseHandle(hThread);
+			}
+		} while (Thread32Next(hSnapshot, &te));
+	}
+	else 
+	{
+#ifdef _LOGGING_ENABLED
+		std::cerr << "Failed to retrieve thread information." << std::endl;
+#endif
+	}
+
+	CloseHandle(hSnapshot);
 }

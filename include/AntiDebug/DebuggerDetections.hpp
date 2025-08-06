@@ -6,6 +6,8 @@ class DebuggerDetections final  : public Debugger::AntiDebug
 public:
     DebuggerDetections(Settings* s) : Debugger::AntiDebug(s)
     {
+        HideAllThreadsFromDebugger();
+        
         AddDetectionFunction([this]() -> bool { return _IsDebuggerPresent(); });
         AddDetectionFunction([this]() -> bool { return _IsDebuggerPresent_HeapFlags(); });
         AddDetectionFunction([this]() -> bool { return _IsDebuggerPresent_CloseHandle(); });

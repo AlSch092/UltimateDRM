@@ -60,7 +60,9 @@ struct DRM::Impl
 		const bool bUsingLicensing, 
 		const bool bCheckHypervisor,
 		const bool bRequireCodeSigning,
-		const std::list<std::wstring> lAllowedParents)
+		const std::list<std::wstring> lAllowedParents,
+		const bool bShutdownOnViolation
+	)
 	{
 		this->ProtectedSettings = new ProtectedMemory(sizeof(Settings));
 
@@ -73,6 +75,7 @@ struct DRM::Impl
 
 		Settings::Instance = this->ProtectedSettings->Construct<Settings>(
 			LicenseServerEndpoint,
+			bShutdownOnViolation,
 			bAllowOfflineUsage,
 			bUsingLicensing,
 			bRequireCodeSigning,
@@ -101,7 +104,7 @@ struct DRM::Impl
 				this->LicenseManagerPtr = std::make_unique<LicenseManager>(LicenseServerEndpoint, Settings::Instance->bAllowOfflineUsage, "license.json");
 			}
 
-			this->IntegrityChecker = std::make_unique<Integrity>();
+			this->IntegrityChecker = std::make_unique<Integrity>(Settings::Instance);
 		}
 		catch (const std::bad_alloc&  ex)
 		{
@@ -133,8 +136,8 @@ struct DRM::Impl
 	bool StopMultipleProcessInstances();
 };
 
-DRM::DRM(const std::string& LicenseServerEndpoint, const bool bAllowOfflineUsage, const bool bUsingLicensing, const bool bCheckHypervisor, const bool bRequireCodeSigning, const std::list<std::wstring> lAllowedParents)
-	: pImpl(new DRM::Impl(LicenseServerEndpoint, bAllowOfflineUsage, bUsingLicensing, bCheckHypervisor, bRequireCodeSigning, lAllowedParents))
+DRM::DRM(const std::string& LicenseServerEndpoint, const bool bAllowOfflineUsage, const bool bUsingLicensing, const bool bCheckHypervisor, const bool bRequireCodeSigning, const std::list<std::wstring> lAllowedParents, const bool bShutdownOnViolation)
+	: pImpl(new DRM::Impl(LicenseServerEndpoint, bAllowOfflineUsage, bUsingLicensing, bCheckHypervisor, bRequireCodeSigning, lAllowedParents, bShutdownOnViolation))
 {
 }
 
@@ -443,7 +446,7 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 
 		uintptr_t ThreadStartAddress = *(uintptr_t*)((uintptr_t)_AddressOfReturnAddress() + ThreadExecutionAddressStackOffset);
 
-		if (!ThreadStartAddress)
+		if (!ThreadStartAddress) //ideal way to do this is make a global structure for new thread creations acting as a whitelist
 			return;
 
 		auto moduleList = Process::GetLoadedModules();
@@ -458,15 +461,17 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 
 		DWORD dwOldProt = 0;
 
-		if (!VirtualProtect((LPVOID)ThreadStartAddress, sizeof(uint8_t), PAGE_EXECUTE_READWRITE, &dwOldProt)) //make thread start address writable
+		if (VirtualProtect((LPVOID)ThreadStartAddress, sizeof(uint8_t), PAGE_EXECUTE_READWRITE, &dwOldProt)) //make thread start address writable
 		{
 #ifdef _LOGGING_ENABLED
 			Logger::logf(Warning, "Failed to call VirtualProtect on ThreadStart address @ TLSCallback: %llX", ThreadStartAddress);
 #endif
+			printf("Patching over %llX\n", ThreadStartAddress);
+			*(uint8_t*)ThreadStartAddress = 0xC3; //patch over any functions which are scheduled to execute next by this thread and not inside our whitelisted address range
+			ExitThread(0);
 		}
 		else
-		{
-		    *(uint8_t*)ThreadStartAddress = 0xC3; //patch over any functions which are scheduled to execute next by this thread and not inside our whitelisted address range	
+		{			
 			ExitThread(0);
 		}
 		

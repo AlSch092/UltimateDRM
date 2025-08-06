@@ -11,6 +11,7 @@ public:
 
 	static Settings* CreateInstance(
 		const std::string LicenseServerEndpoint,
+		const bool bShutdownOnViolation,
 		const bool bAllowOfflineUsage,
 		const bool bUsingLicensing,
 		const bool bRequireCodeSigning,
@@ -28,6 +29,7 @@ public:
 		{
 			Instance = new Settings(
 				LicenseServerEndpoint,
+				bShutdownOnViolation,
 				bAllowOfflineUsage,
 				bUsingLicensing,
 				bRequireCodeSigning,
@@ -49,15 +51,16 @@ public:
 	Settings& operator=(const Settings&) = delete;
 	
 	std::string LicenseServerEndpoint;
-	bool bAllowOfflineUsage;
-	bool bRequireCodeSigning;
-	bool bEnforceSecureBoot;
-	bool bEnforceDSE;
-	bool bEnforceNoKDbg;
-	bool bCheckHypervisor;
-	bool bUseAntiDebugging;
-	bool bCheckIntegrity;
-	bool bRequireRunAsAdministrator;
+	bool bShutdownOnViolation = false;
+	bool bAllowOfflineUsage = true;
+	bool bRequireCodeSigning = true;
+	bool bEnforceSecureBoot = true;
+	bool bEnforceDSE = true;
+	bool bEnforceNoKDbg = true;
+	bool bCheckHypervisor = true;
+	bool bUseAntiDebugging = true;
+	bool bCheckIntegrity = true;
+	bool bRequireRunAsAdministrator = false;
 
 	bool bUsingLicensing;
 
@@ -65,6 +68,7 @@ public:
 
 	Settings(
 		const std::string LicenseServerEndpoint,
+		const bool bShutdownOnViolation,
 		const bool bAllowOfflineUsage,
 		const bool bUsingLicensing,
 		const bool bRequireCodeSigning,
@@ -76,7 +80,7 @@ public:
 		const bool bCheckHypervisor,
 		const bool bRequireRunAsAdministrator,
 		const std::list<std::wstring> allowedParents)
-		: LicenseServerEndpoint(LicenseServerEndpoint), bAllowOfflineUsage(bAllowOfflineUsage), bUsingLicensing(bUsingLicensing), bRequireCodeSigning(bRequireCodeSigning), bEnforceSecureBoot(bEnforceSecureBoot), bEnforceDSE(bEnforceDSE), bEnforceNoKDbg(bEnforceNoKDbg), bUseAntiDebugging(bUseAntiDebugging), bCheckIntegrity(bCheckIntegrity), bCheckHypervisor(bCheckHypervisor), bRequireRunAsAdministrator(bRequireRunAsAdministrator), allowedParents(allowedParents)
+		: LicenseServerEndpoint(LicenseServerEndpoint), bShutdownOnViolation(bShutdownOnViolation), bAllowOfflineUsage(bAllowOfflineUsage), bUsingLicensing(bUsingLicensing), bRequireCodeSigning(bRequireCodeSigning), bEnforceSecureBoot(bEnforceSecureBoot), bEnforceDSE(bEnforceDSE), bEnforceNoKDbg(bEnforceNoKDbg), bUseAntiDebugging(bUseAntiDebugging), bCheckIntegrity(bCheckIntegrity), bCheckHypervisor(bCheckHypervisor), bRequireRunAsAdministrator(bRequireRunAsAdministrator), allowedParents(allowedParents)
 	{
 		if (Instance != nullptr) //since we can't use a private constructor with ProtectedMemory class, we need to check if the instance is already created
 		{

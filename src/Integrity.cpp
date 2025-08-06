@@ -124,28 +124,61 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 				if (!CompareChecksum(Utility::ConvertWStringToString(mod.Name), section.name.c_str(), prev_checksum))
 				{
 #ifdef _LOGGING_ENABLED
-					Logger::logf(Detection, "Checksum for .text is different, tampering detected");
+					Logger::logf(Detection, "Checksum for module %s, section %s is different, tampering detected", Utility::ConvertWStringToString(mod.Name).c_str(), section.name.c_str());
 #endif
-
-					throw std::runtime_error("Integrity check failed: section checksum mismatch");
+					if (integrity->Config->bShutdownOnViolation)
+					{
+						throw std::runtime_error("Integrity check failed: section checksum mismatch");
+					}			    
+					else
+					{
+						IntegrityViolation IV;
+						IV.module = mod.Name;
+						IV.section = Utility::ConvertStringToWString(section.name);
+						IV.address = section.address; //with the 'quick' checksum method, we can't see the exact offset where the checksum difference occured
+						integrity->AddViolation(IV);
+					}
 				}
 
 				if (!CompareChecksumToFileOnDisc(mod.Path, section.name.c_str(), CalculateChecksumFromSection(Utility::ConvertWStringToString(mod.Name), section.name.c_str())))
 				{
 #ifdef _LOGGING_ENABLED
-					Logger::logf(Detection, "Checksum for .text on disk is different, tampering detected");
+					Logger::logf(Detection, "Checksum for module %s on disk (section %s) is different, tampering detected", Utility::ConvertWStringToString(mod.Name).c_str(), section.name.c_str());
 #endif
-					throw std::runtime_error("Integrity check failed: disk file checksum mismatch");
+
+					if (integrity->Config->bShutdownOnViolation)
+					{
+						throw std::runtime_error("Integrity check failed: disk file checksum mismatch");
+					}
+					else
+					{
+						IntegrityViolation IV;
+						IV.module = mod.Name;
+						IV.section = Utility::ConvertStringToWString(section.name);
+						IV.address = section.address; //with the 'quick' checksum method, we can't see the exact offset where the checksum difference occured
+						integrity->AddViolation(IV);
+					}				
 				}
 
 #ifndef _DEBUG
-				if (FindWritableAddress(Utility::ConvertWStringToString(mod.Name), section.name.c_str()) != 0) //check if any page is writable inside .text|.rdata
+				if (uintptr_t addr = FindWritableAddress(Utility::ConvertWStringToString(mod.Name), section.name.c_str()) != 0) //check if any page is writable inside .text|.rdata
 				{
 #ifdef _LOGGING_ENABLED
-					Logger::logf(Detection, "non-writable section %s had writable page", section.name.c_str());
-#endif
-					//optionally, log to a remote server
-					throw std::runtime_error("Integrity check failed: read-only section has writable page(s)");
+					Logger::logf(Detection, "non-writable section %s had writable page at %llx", section.name.c_str(), addr);
+#endif			
+					if (integrity->Config->bShutdownOnViolation)
+					{
+						throw std::runtime_error("Integrity check failed: read-only section has writable page(s)");
+					}
+					else
+					{
+						IntegrityViolation IV;
+						IV.module = mod.Name;
+						IV.description = L"page=writable";
+						IV.section = Utility::ConvertStringToWString(section.name);
+						IV.address = addr; //with the 'quick' checksum method, we can't see the exact offset where the checksum difference occured
+						integrity->AddViolation(IV);
+					}
 				}
 #endif
 			}		

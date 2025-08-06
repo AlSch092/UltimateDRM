@@ -89,9 +89,8 @@ namespace Debugger
 
         static void CheckForDebugger(LPVOID AD); //thread looping function to monitor, pass AntiDebug* member as `AD`
 
-        static bool PreventWindowsDebuggers(); //experimental method, patch DbgBreakpoint + DbgUiRemoteBreakin
-
         static bool HideThreadFromDebugger(HANDLE hThread);
+        static void HideAllThreadsFromDebugger();
 
         template<typename Func>
         void AddDetectionFunction(Func func) //define detection functions in the subclass, `DebuggerDetections`, then add them to the list using this func
