@@ -152,7 +152,6 @@ RmpRemapImage(
         goto exit;
     }
 
-
     //Allocate an executable and writable buffer where the remap routine will execute.
     pRemapRegion = VirtualAlloc(
         NULL,
@@ -179,7 +178,6 @@ RmpRemapImage(
         (ULONG_PTR)RmppRemapImageRoutine -
         ImageBase); 
 
-    MessageBoxA(0, "1", 0, 0);
 
     //
     // Invoke the remap routine inside the remap region.
@@ -192,7 +190,6 @@ RmpRemapImage(
 #endif
         goto exit;
     }
-    MessageBoxA(0, "2", 0, 0);
 
     //
     // Verify that each pe section in the remapped image is protected.
