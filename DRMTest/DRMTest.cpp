@@ -21,7 +21,7 @@
 
 uintptr_t GetSectionStart(HMODULE hModule, const char* sectionName)
 {
-	if (!hModule) 
+	if (!hModule)
 		return 0;
 
 	auto base = reinterpret_cast<BYTE*>(hModule);
@@ -42,15 +42,16 @@ uintptr_t GetSectionStart(HMODULE hModule, const char* sectionName)
 
 int main(int argc, char** argv)
 {
-	std::list<std::wstring> lAllowedParents = { L"steam.exe", L"explorer.exe", L"VsDebugConsole.exe", L"powershell.exe", L"pwsh.exe", L"cmd.exe"};
+	std::list<std::wstring> lAllowedParents = { L"steam.exe", L"explorer.exe", L"VsDebugConsole.exe", L"powershell.exe", L"pwsh.exe", L"cmd.exe" };
 
 	const std::string LicenseServerEndpoint = "https://example.com/api/license"; //replace with your actual license server endpoint
 	const bool bAllowOfflineUsage = true;
 	const bool bUsingLicensing = false;
 	const bool bEnforceHypervisorCheck = false; //having this set to true will cause Github Actions tests to fail, since they run on a VM
 	const bool bRequireCodeSigning = false; //in production code, this should be set to true
+	const bool bShutdownOnViolation = false; //throws runtime error if integrity violation is found
 
-	DRM* drm = new DRM(LicenseServerEndpoint, bAllowOfflineUsage, bUsingLicensing, bEnforceHypervisorCheck, bRequireCodeSigning, lAllowedParents);
+	DRM* drm = new DRM(LicenseServerEndpoint, bAllowOfflineUsage, bUsingLicensing, bEnforceHypervisorCheck, bRequireCodeSigning, lAllowedParents, bShutdownOnViolation);
 
 	try
 	{
