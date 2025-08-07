@@ -101,6 +101,9 @@ public:
 
 	bool CheckLoadedModuleHashVersusDiskHash(__in const std::string module, __in const char* sectionName, __in std::wstring diskFilePath);
 
+	static std::list<ProcessData::ImportFunction> FetchHookedIATEntries();
+	static bool DoesIATContainHooked();
+
 	void StoreModuleChecksum(ModuleChecksumData module) 
 	{
 		auto it = std::find_if(this->ModuleChecksums.begin(), this->ModuleChecksums.end(), [module](const ModuleChecksumData& m) { return (module.hMod == m.hMod); });

@@ -64,7 +64,9 @@ namespace ProcessData
 		HMODULE Module;
 		std::string AssociatedModuleName;
 		std::string FunctionName;
+		uintptr_t AddressToFuncPtr;
 		uintptr_t AddressOfData;
+		uintptr_t FunctionPtr;
 	};
 }
 
@@ -142,7 +144,7 @@ public:
 
 	static DWORD GetModuleSize(__in const HMODULE module);
 
-	static list<ProcessData::ImportFunction*> GetIATEntries(); //start of IAT hook checks
+	static list<ProcessData::ImportFunction> GetIATEntries(const std::string& module); //start of IAT hook checks
 
 	static bool IsReturnAddressInModule(__in const uintptr_t RetAddr, __in const  wchar_t* module);
 

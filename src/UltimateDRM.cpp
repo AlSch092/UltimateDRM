@@ -117,7 +117,7 @@ struct DRM::Impl
 			try
 			{
 				this->AntiDebugger = std::make_unique<DebuggerDetections>(Settings::Instance);
-				this->AntiDebugger->StartAntiDebugThread();
+				//this->AntiDebugger->StartAntiDebugThread();
 			}
 			catch (const std::bad_alloc& ex)
 			{
@@ -409,9 +409,9 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 
 		if (WinVersion == Windows10) //Windows 11 no longer has the thread's start address on its stack when the tls callback is hit
 #ifdef _M_X64
-		ThreadExecutionAddressStackOffset = 0x378;
+			ThreadExecutionAddressStackOffset = 0x378;
 #else
-		ThreadExecutionAddressStackOffset = 0x26C;
+			ThreadExecutionAddressStackOffset = 0x26C;
 #endif
 
 		SetUnhandledExceptionFilter(g_VectoredExceptionHandler);
@@ -508,5 +508,4 @@ LONG WINAPI g_VectoredExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo)
 #endif
 	return EXCEPTION_CONTINUE_SEARCH;
 }
-
 
