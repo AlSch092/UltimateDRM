@@ -1,4 +1,6 @@
-# Changelog - UltimateDRM
+# Changelog - UltimateDRM  
+
+- Aug 6 2025: Added IAT hook checks for all loaded modules  
 - Aug 5 2025:  Finished integrity checks on all non-writable sections of all modules  
 - Aug 3 2025:  Added x86 support, integrity checks on all loaded modules  
 - Aug 1 2025:   Added checks for if pages are writable in .text, .rdata  
