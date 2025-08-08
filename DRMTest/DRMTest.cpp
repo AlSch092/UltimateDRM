@@ -3,11 +3,11 @@
 
 #include <iostream>
 #include <Windows.h>
-#include "../include/DRM.hpp"
+#include "../include/UltimateDRM.hpp"
 
 #ifdef _M_X64
 #ifdef _DEBUG
-#pragma comment(lib, "../x64/Debug/UltimateDRM.libUltimateDRM-d.lib")
+#pragma comment(lib, "../x64/Debug/UltimateDRM-d.lib")
 #else
 #pragma comment(lib, "../x64/Release/UltimateDRM.lib")
 #endif
@@ -42,6 +42,8 @@ uintptr_t GetSectionStart(HMODULE hModule, const char* sectionName)
 
 int main(int argc, char** argv)
 {
+	int testResult = 0;
+
 	std::list<std::wstring> lAllowedParents = { L"steam.exe", L"explorer.exe", L"VsDebugConsole.exe", L"powershell.exe", L"pwsh.exe", L"cmd.exe" };
 
 	const std::string LicenseServerEndpoint = "https://example.com/api/license"; //replace with your actual license server endpoint
@@ -50,8 +52,18 @@ int main(int argc, char** argv)
 	const bool bEnforceHypervisorCheck = false; //having this set to true will cause Github Actions tests to fail, since they run on a VM
 	const bool bRequireCodeSigning = false; //in production code, this should be set to true
 	const bool bShutdownOnViolation = false; //throws runtime error if integrity violation is found
+	const bool bEnforceSecureBoot = true;
+	const bool bEnforceDSE = true;
+	const bool bEnforceNoKdb = true;
+	const bool bUseAntiDebugging = false;
+	const bool bCheckModulesIntegrity = true;
+	const bool bCheckHypervisor = true;
+	const bool bForceRunAsAdmin = false;
 
-	DRM* drm = new DRM(LicenseServerEndpoint, bAllowOfflineUsage, bUsingLicensing, bEnforceHypervisorCheck, bRequireCodeSigning, lAllowedParents, bShutdownOnViolation);
+	Settings* s = new Settings(LicenseServerEndpoint, bShutdownOnViolation, bAllowOfflineUsage, bUsingLicensing, bRequireCodeSigning, bEnforceSecureBoot,
+		bEnforceDSE, bEnforceNoKdb, bUseAntiDebugging, bCheckModulesIntegrity, bCheckHypervisor, bForceRunAsAdmin, lAllowedParents);
+
+	UltimateDRM* drm = new UltimateDRM(s);
 
 	try
 	{
@@ -76,6 +88,8 @@ int main(int argc, char** argv)
 		return 3;
 	}
 
+	DWORD dwOldProt = 0;
+
 #ifdef _M_X64   //no self remapping in x86
 #ifndef _DEBUG
 	//TEST: Check if sections page protections can be changed after remap
@@ -84,15 +98,13 @@ int main(int argc, char** argv)
 	if (textSectionStart == 0)
 	{
 		std::cerr << "Failed to find .text section start address.\n";
-		return 4;
+		testResult = 4;
 	}
-
-	DWORD dwOldProt = 0;
 
 	if (VirtualProtect((LPVOID)textSectionStart, 0x1000, PAGE_EXECUTE_READWRITE, &dwOldProt))
 	{
-		std::cout << "Text section is writable: test failed\n";
-		return 5;
+		std::cout << "Text section is writable: test failed, or you compiled with _DYN_LIB defined\n";
+		testResult = 5;
 	}
 	else
 	{
@@ -101,9 +113,34 @@ int main(int argc, char** argv)
 #endif
 #endif
 
+	const HMODULE k32hMod = GetModuleHandleW(L"kernel32.dll");
+	const uintptr_t	k32_text = GetSectionStart(k32hMod, ".text");
+	
+	if (k32_text && VirtualProtect((LPVOID)k32_text, 1024, PAGE_EXECUTE_READWRITE, &dwOldProt))
+	{
+		*(uint8_t*)k32_text = 0xC3; //patch over k32's .text section to show integrity checks work
+	}
+
+	for (int i = 0; i < 10; i++)
+	{
+		const auto drmViolation = drm->GetViolations();
+
+		for (const auto& violation : drmViolation)
+		{
+			std::wcout << L"(T: " << violation.timestamp << L") Violation type: " << violation.type << L", at address: " << std::hex << violation.address;
+			
+			if (violation.description.length() > 0)
+				std::wcout << L", description: " << violation.description << std::endl;
+			else
+				std::wcout << std::endl;
+		}
+
+		Sleep(1000);
+	}
+
 	delete drm;
 
 	std::cout << "Closing DRM Test program...\n";
 
-	return 0;
+	return testResult;
 }
