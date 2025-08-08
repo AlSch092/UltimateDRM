@@ -5,7 +5,7 @@
 #ifdef _M_X64
 #include "../include/remap.hpp"
 #endif
-#include "../include/DRM.hpp"
+#include "../include/UltimateDRM.hpp" //keep majority of includes in this .cpp instead of .hpp to hide implementation details from lib user and reduce number of header files needing to distribute
 #include "../include/Settings.hpp"
 #include "../include/MapProtectedClass.hpp"
 #include "../include/Logger.hpp"
@@ -36,16 +36,13 @@ EXTERN_C __declspec(allocate(".CRT$XLB"))  PIMAGE_TLS_CALLBACK tls_callback = TL
 #pragma data_seg(pop, old)
 #endif
 
-Settings* Settings::Instance = nullptr; //singleton static instance decl to avoid compilation errors
-
 /*
-	The DRM class provides runtime DRM through integrity checks and licensing
-	** There is no such thing as an 'uncrackable DRM', and allowing offline product usage makes things much tougher to enforce **
-	** Any parts of code which run on the client side will never be tamper-proof **
-
-	The protected program should include this .lib and .hpp and use the DRM class
+	* The DRM class provides runtime DRM through integrity checks and licensing
+	*  *There is no such thing as an 'uncrackable DRM', and allowing offline product usage makes things much tougher to enforce *
+	* 
+	* The protected program should include this .lib and .hpp and use the DRM class
 */
-struct DRM::Impl
+struct UltimateDRM::Impl
 {
 	ProtectedMemory* ProtectedSettings = nullptr;
 
@@ -55,42 +52,31 @@ struct DRM::Impl
 
 	std::unique_ptr<DebuggerDetections> AntiDebugger = nullptr; //debugger detections for the current process
 
-	Impl(const std::string& LicenseServerEndpoint,
-		const bool bAllowOfflineUsage, 
-		const bool bUsingLicensing, 
-		const bool bCheckHypervisor,
-		const bool bRequireCodeSigning,
-		const std::list<std::wstring> lAllowedParents,
-		const bool bShutdownOnViolation
-	)
+	Settings* Config = nullptr;
+
+	Impl(Settings* s)
 	{
 		this->ProtectedSettings = new ProtectedMemory(sizeof(Settings));
 
-		const bool bEnforceSecureBoot = true;
-		const bool bEnforceDSE = true;
-		const bool bEnforceNoKDbg = true;
-		const bool bUseAntiDebugging = true;
-		const bool bCheckIntegrity = true;
-		const bool bRequireRunAsAdministrator = false;
-
-		Settings::Instance = this->ProtectedSettings->Construct<Settings>(
-			LicenseServerEndpoint,
-			bShutdownOnViolation,
-			bAllowOfflineUsage,
-			bUsingLicensing,
-			bRequireCodeSigning,
-			bEnforceSecureBoot,
-			bEnforceDSE,
-			bEnforceNoKDbg,
-			bUseAntiDebugging,
-			bCheckIntegrity,
-			bCheckHypervisor,
-			bRequireRunAsAdministrator,
-			lAllowedParents);
+		//since we're mapping our settings instance into protected memory, re-make an object with the same options that the user provided
+		this->Config = this->ProtectedSettings->Construct<Settings>( 
+			s->LicenseServerEndpoint,
+			s->bShutdownOnViolation,
+			s->bAllowOfflineUsage,
+			s->bUsingLicensing,
+			s->bRequireCodeSigning,
+			s->bEnforceSecureBoot,
+			s->bEnforceDSE,
+			s->bEnforceNoKDbg,
+			s->bUseAntiDebugging,
+			s->bCheckIntegrity,
+			s->bCheckHypervisor,
+			s->bRequireRunAsAdministrator,
+			s->lAllowedParentNames);
 
 		try
 		{
-			this->ProtectedSettings->Protect(); //remap the protected memory to prevent tampering (this doesn't call DRM::Protect)
+			this->ProtectedSettings->Protect(); //remap the protected memory to prevent write-tampering
 		}
 		catch (const std::runtime_error& ex)
 		{
@@ -99,12 +85,12 @@ struct DRM::Impl
 
 		try
 		{
-			if (Settings::Instance->bUsingLicensing)
+			if (this->Config->bUsingLicensing)
 			{
-				this->LicenseManagerPtr = std::make_unique<LicenseManager>(LicenseServerEndpoint, Settings::Instance->bAllowOfflineUsage, "license.json");
+				this->LicenseManagerPtr = std::make_unique<LicenseManager>(this->Config->LicenseServerEndpoint, this->Config->bAllowOfflineUsage, "license.json");
 			}
 
-			this->IntegrityChecker = std::make_unique<Integrity>(Settings::Instance);
+			this->IntegrityChecker = std::make_unique<Integrity>(this->Config);
 		}
 		catch (const std::bad_alloc&  ex)
 		{
@@ -112,12 +98,12 @@ struct DRM::Impl
 		}
 
 #ifndef _DEBUG
-		if (Settings::Instance->bUseAntiDebugging)
+		if (this->Config->bUseAntiDebugging)
 		{
 			try
 			{
-				this->AntiDebugger = std::make_unique<DebuggerDetections>(Settings::Instance);
-				//this->AntiDebugger->StartAntiDebugThread();
+				this->AntiDebugger = std::make_unique<DebuggerDetections>(this->Config);
+				this->AntiDebugger->StartAntiDebugThread();
 			}
 			catch (const std::bad_alloc& ex)
 			{
@@ -136,9 +122,38 @@ struct DRM::Impl
 	bool StopMultipleProcessInstances();
 };
 
-DRM::DRM(const std::string& LicenseServerEndpoint, const bool bAllowOfflineUsage, const bool bUsingLicensing, const bool bCheckHypervisor, const bool bRequireCodeSigning, const std::list<std::wstring> lAllowedParents, const bool bShutdownOnViolation)
-	: pImpl(new DRM::Impl(LicenseServerEndpoint, bAllowOfflineUsage, bUsingLicensing, bCheckHypervisor, bRequireCodeSigning, lAllowedParents, bShutdownOnViolation))
+UltimateDRM::UltimateDRM(Settings* s)
+	: pImpl(new UltimateDRM::Impl(s))
 {
+}
+
+/**
+ * @brief Fetches violations from protective objects and combines into a returned list
+ *
+ * @return vector of DRMViolation structures, representing all violations that have occurred
+ *
+ * @usage
+ *  std::vector<DRMViolation> violationList = DRM->GetViolations();
+ */
+std::vector<DRMViolation> UltimateDRM::GetViolations() const noexcept
+{
+	std::vector<DRMViolation> violationList;
+
+	if (this->pImpl == nullptr || this->pImpl->IntegrityChecker == nullptr)
+		return {};
+
+	auto integrityViolations = this->pImpl->IntegrityChecker->GetViolations();
+
+	{
+		std::lock_guard<std::mutex>  lock(this->pImpl->IntegrityChecker->ViolationsMutex);
+		//fetch violation list from integrityChecker, antidebugger, etc, copy to a returned list
+		for (const auto& integrityViolation : integrityViolations)
+		{
+			violationList.emplace_back(DRMViolation{ DRMViolation::Type::Integrity, integrityViolation.address,  integrityViolation.description, integrityViolation.timestamp });
+		}
+	}
+
+	return violationList;
 }
 
 
@@ -156,7 +171,7 @@ DRM::DRM(const std::string& LicenseServerEndpoint, const bool bAllowOfflineUsage
  * @usage
  * try { drm->Protect(); } catch(std::runtime_error& ex) { std::cerr << "DRM protection failed: " << ex.what() << std::endl; }
  */
-bool DRM::Protect()
+bool UltimateDRM::Protect()
 {
 	if (!this->pImpl->StopMultipleProcessInstances()) //prevent multiple client instances by using shared memory-mapped region
 	{
@@ -166,14 +181,14 @@ bool DRM::Protect()
 		terminate();
 	}
 
-	if (Settings::Instance->bUsingLicensing)
+	if (this->pImpl->Config->bUsingLicensing)
 	{
 		if (this->pImpl->LicenseManagerPtr == nullptr)
 		{
 			throw std::runtime_error("LicenseManagerPtr is not initialized");
 		}
 
-		if (!Settings::Instance->bAllowOfflineUsage)
+		if (!this->pImpl->Config->bAllowOfflineUsage)
 		{
 			if (!this->pImpl->LicenseManagerPtr->VerifyLicenseOnline(false))
 			{
@@ -189,12 +204,12 @@ bool DRM::Protect()
 		}
 	}
 
-	if (!Settings::Instance->allowedParents.empty()) //check parent process
+	if (!this->pImpl->Config->lAllowedParentNames.empty()) //check parent process
 	{
 		bool verifiedParent = false;
 		DWORD parentPid = Process::GetParentProcessId();
 
-		for (std::wstring parent : Settings::Instance->allowedParents) 	//check parent process name, then check code signing cert
+		for (std::wstring parent : this->pImpl->Config->lAllowedParentNames) 	//check parent process name, then check code signing cert
 		{
 			std::wstring parentProcName = Process::GetProcessName(parentPid);
 
@@ -203,7 +218,7 @@ bool DRM::Protect()
 
 			std::wstring parentProcDirectory = Services::GetProcessDirectoryW(parentPid);
 
-			if (Settings::Instance->bRequireCodeSigning)
+			if (this->pImpl->Config->bRequireCodeSigning)
 			{
 				if (!Authenticode::HasSignature(std::wstring(parentProcDirectory + parentProcName).c_str(), TRUE))
 				{
@@ -234,7 +249,7 @@ bool DRM::Protect()
 		}
 	}
 
-	if (Settings::Instance->bCheckIntegrity)
+	if (this->pImpl->Config->bCheckIntegrity)
 	{
 #ifdef _M_X64
 #ifdef _TARGET_STATIC_LIB //if this lib is used in a .DLL to remap a host process (.exe) module, it will crash. need to debug it further (still works to compile this .lib into a .exe and remap)
@@ -271,7 +286,7 @@ bool DRM::Protect()
 		}		
 	}
 
-	if (Settings::Instance->bRequireCodeSigning)
+	if (this->pImpl->Config->bRequireCodeSigning)
 	{
 		std::wstring currentProcName = Process::GetProcessName(GetCurrentProcessId());
 		std::wstring processDirectory = Services::GetProcessDirectoryW(GetCurrentProcessId());
@@ -293,7 +308,7 @@ bool DRM::Protect()
 		}
 	}
 
-	if (Settings::Instance->bCheckHypervisor)
+	if (this->pImpl->Config->bCheckHypervisor)
 	{
 		if (Services::IsHypervisorPresent())
 		{
@@ -333,7 +348,7 @@ bool DRM::Protect()
  * @usage
  * this->pImpl->StopMultipleProcessInstances();
  */
-bool DRM::Impl::StopMultipleProcessInstances()
+bool UltimateDRM::Impl::StopMultipleProcessInstances()
 {
 	HANDLE hSharedMemory = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(int), "UDRM");
 
@@ -466,7 +481,6 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 #ifdef _LOGGING_ENABLED
 			Logger::logf(Warning, "Failed to call VirtualProtect on ThreadStart address @ TLSCallback: %llX", ThreadStartAddress);
 #endif
-			printf("Patching over %llX\n", ThreadStartAddress);
 			*(uint8_t*)ThreadStartAddress = 0xC3; //patch over any functions which are scheduled to execute next by this thread and not inside our whitelisted address range
 			ExitThread(0);
 		}
@@ -504,7 +518,7 @@ LONG WINAPI g_VectoredExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo)
 	DWORD exceptionCode = ExceptionInfo->ExceptionRecord->ExceptionCode;
 
 #ifdef _LOGGING_ENABLED
-	Logger::logf(Err, "Vectored Exception Handler called with exception code : 0x%08X\n", exceptionCode);
+	Logger::logf(Err, "Vectored Exception Handler at %llX called with exception code : 0x%08X\n", ExceptionInfo->ExceptionRecord->ExceptionAddress, exceptionCode);
 #endif
 	return EXCEPTION_CONTINUE_SEARCH;
 }

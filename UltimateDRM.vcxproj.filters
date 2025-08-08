@@ -81,7 +81,7 @@
     <ClInclude Include="include\NAuthenticode.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="include\DRM.hpp">
+    <ClInclude Include="include\UltimateDRM.hpp">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="include\LicenseManager.hpp">

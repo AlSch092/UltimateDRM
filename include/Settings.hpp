@@ -22,27 +22,24 @@ public:
 		const bool bCheckIntegrity,
 		const bool bCheckHypervisor,
 		const bool bRequireRunAsAdministrator,
-		const std::list<std::wstring> allowedParents
+		const std::list<std::wstring> lAllowedParentNames
 	)
 	{
-		if (!Instance)
-		{
-			Instance = new Settings(
-				LicenseServerEndpoint,
-				bShutdownOnViolation,
-				bAllowOfflineUsage,
-				bUsingLicensing,
-				bRequireCodeSigning,
-				bEnforceSecureBoot,
-				bEnforceDSE,
-				bEnforceNoKDbg,
-				bUseAntiDebugging,
-				bCheckIntegrity,
-				bCheckHypervisor,
-				bRequireRunAsAdministrator,
-				allowedParents
+		Settings* Instance = new Settings(
+			LicenseServerEndpoint,
+			bShutdownOnViolation,
+			bAllowOfflineUsage,
+			bUsingLicensing,
+			bRequireCodeSigning,
+			bEnforceSecureBoot,
+			bEnforceDSE,
+			bEnforceNoKDbg,
+			bUseAntiDebugging,
+			bCheckIntegrity,
+			bCheckHypervisor,
+			bRequireRunAsAdministrator,
+			lAllowedParentNames
 			);
-		}
 
 		return Instance;
 	}
@@ -64,7 +61,7 @@ public:
 
 	bool bUsingLicensing;
 
-	std::list<std::wstring> allowedParents;
+	std::list<std::wstring> lAllowedParentNames;
 
 	Settings(
 		const std::string LicenseServerEndpoint,
@@ -79,14 +76,8 @@ public:
 		const bool bCheckIntegrity,
 		const bool bCheckHypervisor,
 		const bool bRequireRunAsAdministrator,
-		const std::list<std::wstring> allowedParents)
-		: LicenseServerEndpoint(LicenseServerEndpoint), bShutdownOnViolation(bShutdownOnViolation), bAllowOfflineUsage(bAllowOfflineUsage), bUsingLicensing(bUsingLicensing), bRequireCodeSigning(bRequireCodeSigning), bEnforceSecureBoot(bEnforceSecureBoot), bEnforceDSE(bEnforceDSE), bEnforceNoKDbg(bEnforceNoKDbg), bUseAntiDebugging(bUseAntiDebugging), bCheckIntegrity(bCheckIntegrity), bCheckHypervisor(bCheckHypervisor), bRequireRunAsAdministrator(bRequireRunAsAdministrator), allowedParents(allowedParents)
+		const std::list<std::wstring> lAllowedParentNames)
+		: LicenseServerEndpoint(LicenseServerEndpoint), bShutdownOnViolation(bShutdownOnViolation), bAllowOfflineUsage(bAllowOfflineUsage), bUsingLicensing(bUsingLicensing), bRequireCodeSigning(bRequireCodeSigning), bEnforceSecureBoot(bEnforceSecureBoot), bEnforceDSE(bEnforceDSE), bEnforceNoKDbg(bEnforceNoKDbg), bUseAntiDebugging(bUseAntiDebugging), bCheckIntegrity(bCheckIntegrity), bCheckHypervisor(bCheckHypervisor), bRequireRunAsAdministrator(bRequireRunAsAdministrator), lAllowedParentNames(lAllowedParentNames)
 	{
-		if (Instance != nullptr) //since we can't use a private constructor with ProtectedMemory class, we need to check if the instance is already created
-		{
-			throw std::runtime_error("The Settings object instance already exists!");
-		}
 	}
-
-	static Settings* Instance; //singleton-style instance
 };

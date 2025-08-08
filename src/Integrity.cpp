@@ -101,14 +101,23 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 		uintptr_t checksum_main = 0;
 		uintptr_t prev_checksum = 0;
 
-//		auto hookedIATEntries = FetchHookedIATEntries(); //this should go in a future or thread, has O(n^2) execution time where n=number loaded modules
-//
-//		if (hookedIATEntries.size() > 0)
-//		{
-//#ifdef _LOGGING_ENABLED
-//			Logger::logfw(Detection, L"IAT was hooked!");
-//#endif
-//		}
+		auto hookedIATEntries = FetchHookedIATEntries(); //this should go in a future or thread, has O(n^2) execution time where n=number loaded modules
+
+		if (hookedIATEntries.size() > 0)
+		{
+#ifdef _LOGGING_ENABLED
+			Logger::logfw(Detection, L"IAT was hooked!");
+#endif
+			for (const auto& hookedIATEntry : hookedIATEntries)
+			{
+				IntegrityViolation IV;
+				IV.module = Utility::ConvertStringToWString(hookedIATEntries.front().AssociatedModuleName);
+				IV.section = L".rdata"; //IAT data is in .rdata
+				IV.address = hookedIATEntry.AddressToFuncPtr;
+				IV.description = L"IAT Hooked";
+				integrity->AddViolation(IV); //will avoid duplicates
+			}
+		}
 
 		for (const auto& mod : integrity->ModuleChecksums) //check checksums of all loaded modules vs. what was gathered at startup
 		{
@@ -142,7 +151,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 						IntegrityViolation IV;
 						IV.module = mod.Name;
 						IV.section = Utility::ConvertStringToWString(section.name);
-						IV.address = section.address; //with the 'quick' checksum method, we can't see the exact offset where the checksum difference occured
+						IV.address = (uintptr_t)mod.hMod + section.address; //with the 'quick' checksum method, we can't see the exact offset where the checksum difference occured
 						integrity->AddViolation(IV);
 					}
 				}
@@ -162,7 +171,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 						IntegrityViolation IV;
 						IV.module = mod.Name;
 						IV.section = Utility::ConvertStringToWString(section.name);
-						IV.address = section.address; //with the 'quick' checksum method, we can't see the exact offset where the checksum difference occured
+						IV.address = (uintptr_t)mod.hMod + section.address; //with the 'quick' checksum method, we can't see the exact offset where the checksum difference occured
 						integrity->AddViolation(IV);
 					}				
 				}
@@ -183,7 +192,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 						IV.module = mod.Name;
 						IV.description = L"page=writable";
 						IV.section = Utility::ConvertStringToWString(section.name);
-						IV.address = addr; //with the 'quick' checksum method, we can't see the exact offset where the checksum difference occured
+						IV.address = (uintptr_t)mod.hMod + section.address; //with the 'quick' checksum method, we can't see the exact offset where the checksum difference occured
 						integrity->AddViolation(IV);
 					}
 				}

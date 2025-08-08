@@ -15,6 +15,7 @@ struct IntegrityViolation
 	std::wstring section;
 	std::wstring description;
 	uintptr_t address = 0;
+	uint64_t timestamp = GetTickCount64();
 
 	bool operator==(const IntegrityViolation& other) const noexcept
 	{
@@ -128,16 +129,18 @@ public:
 
 	auto GetViolations() const 
 	{ 
-		std::lock_guard<std::mutex>  lock(ViolationsMutex);
+		std::lock_guard<std::mutex> lock(ViolationsMutex);
 		return this->Violations; 
 	}
 
-	void AddViolation(const IntegrityViolation iv)
+	void AddViolation(const IntegrityViolation& iv)
 	{
 		std::lock_guard<std::mutex>  lock(ViolationsMutex);
 		if (std::find(Violations.begin(), Violations.end(), iv) == Violations.end())
 			Violations.push_back(iv);
 	}
+
+	mutable std::mutex ViolationsMutex;
 
 private:
 
@@ -152,5 +155,5 @@ private:
 	Settings* Config = nullptr; //non-owning pointer; do not delete at class destruction. 
 
 	std::vector<IntegrityViolation> Violations;
-	mutable std::mutex ViolationsMutex;
+
 };

@@ -48,7 +48,7 @@
     <ClInclude Include="include\curl\urlapi.h" />
     <ClInclude Include="include\curl\websockets.h" />
     <ClInclude Include="include\Definitions.hpp" />
-    <ClInclude Include="include\DRM.hpp" />
+    <ClInclude Include="include\UltimateDRM.hpp" />
     <ClInclude Include="include\DRMException.hpp" />
     <ClInclude Include="include\HttpClient.hpp" />
     <ClInclude Include="include\Integrity.hpp" />
@@ -188,7 +188,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalDependencies>ntdll.lib;wintrust.lib;"lib/libcurl-d.lib"; "lib/zlibd.lib";</AdditionalDependencies>
+      <AdditionalDependencies>ntdll.lib;wintrust.lib;crypt32.lib; "lib/libcurl-d.lib"; "lib/zlibd.lib";</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

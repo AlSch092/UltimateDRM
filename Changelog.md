@@ -1,5 +1,6 @@
 # Changelog - UltimateDRM  
 
+- Aug 7 2025: Added DRM violation lists, bug fixes and more testing  
 - Aug 6 2025: Added IAT hook checks for all loaded modules  
 - Aug 5 2025:  Finished integrity checks on all non-writable sections of all modules  
 - Aug 3 2025:  Added x86 support, integrity checks on all loaded modules  
