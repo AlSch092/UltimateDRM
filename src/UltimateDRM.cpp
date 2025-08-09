@@ -190,7 +190,7 @@ bool UltimateDRM::Protect()
 
 		if (!this->pImpl->Config->bAllowOfflineUsage)
 		{
-			if (!this->pImpl->LicenseManagerPtr->VerifyLicenseOnline(false))
+			if (!this->pImpl->LicenseManagerPtr->VerifyLicenseOnline(false)) //licensing is not finished yet!
 			{
 				throw DRMException(DRMException::LicenseVerificationFailed);
 			}
@@ -384,6 +384,20 @@ bool UltimateDRM::Impl::StopMultipleProcessInstances()
 }
 
 /**
+ * @brief TLS callback helper to end unknown threads without patching over their start address or calling ExitThread
+ *
+ * This function is executed by writing over the start address of new unknown threads in the tls callback
+
+ * @return None
+ *
+ * @usage
+ *  N/A
+ */
+void ExitThreadGracefully()
+{
+}
+
+/**
  * @brief TLS callback
  *
  * This function is executed on thread attach/detach and process attach/detach
@@ -424,7 +438,7 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 
 		if (WinVersion == Windows10) //Windows 11 no longer has the thread's start address on its stack when the tls callback is hit
 #ifdef _M_X64
-			ThreadExecutionAddressStackOffset = 0x378;
+			ThreadExecutionAddressStackOffset = 0x378; //are there any reliable ways to get this across all windows builds?
 #else
 			ThreadExecutionAddressStackOffset = 0x26C;
 #endif
@@ -459,6 +473,7 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 		if (WinVersion == WindowsVersion::Windows11) //thread start address is not on the stack in windows 11
 			return;
 
+		uintptr_t stackThreadStartSlot = (uintptr_t)_AddressOfReturnAddress() + ThreadExecutionAddressStackOffset;
 		uintptr_t ThreadStartAddress = *(uintptr_t*)((uintptr_t)_AddressOfReturnAddress() + ThreadExecutionAddressStackOffset);
 
 		if (!ThreadStartAddress) //ideal way to do this is make a global structure for new thread creations acting as a whitelist
@@ -470,25 +485,13 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 		{
 			if (ThreadStartAddress > ((uintptr_t)module.dllInfo.lpBaseOfDll) && ThreadStartAddress < ((uintptr_t)module.dllInfo.lpBaseOfDll + module.dllInfo.SizeOfImage))
 			{
+				// <--- we should also make sure the module is signed, ideally using a cache
 				return; // thread is executing within a valid module range, no need to suppress/exit it
 			}
 		}
 
-		DWORD dwOldProt = 0;
-
-		if (VirtualProtect((LPVOID)ThreadStartAddress, sizeof(uint8_t), PAGE_EXECUTE_READWRITE, &dwOldProt)) //make thread start address writable
-		{
-#ifdef _LOGGING_ENABLED
-			Logger::logf(Warning, "Failed to call VirtualProtect on ThreadStart address @ TLSCallback: %llX", ThreadStartAddress);
-#endif
-			*(uint8_t*)ThreadStartAddress = 0xC3; //patch over any functions which are scheduled to execute next by this thread and not inside our whitelisted address range
-			ExitThread(0);
-		}
-		else
-		{			
-			ExitThread(0);
-		}
-		
+		*(uintptr_t*)stackThreadStartSlot = (uintptr_t)&ExitThreadGracefully;
+				
 	}break;
 
 	case DLL_THREAD_DETACH:

@@ -13,6 +13,14 @@
  */
 bool HttpClient::GetRequest(__inout HttpRequest& requestInfo) //GET request
 {
+    if (requestInfo.url.empty())
+    {
+#ifdef _LOGGING_ENABLED
+        Logger::logf(Warning, "url was empty @  HttpClient::GetRequest");
+#endif
+        return false;
+    }
+
     const int OPERATION_TIMEOUT = 15L;
     const int CONNECT_TIMEOUT = 15L;
 
@@ -37,17 +45,18 @@ bool HttpClient::GetRequest(__inout HttpRequest& requestInfo) //GET request
         curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, HeaderCallback);
         curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response_headers);
 
-        //set cookie
-        curl_easy_setopt(curl, CURLOPT_COOKIE, requestInfo.cookie.c_str());
+        if(!requestInfo.cookie.empty())
+            curl_easy_setopt(curl, CURLOPT_COOKIE, requestInfo.cookie.c_str()); 
 
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, OPERATION_TIMEOUT);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, CONNECT_TIMEOUT);
 
         if (requestInfo.requestHeaders.size() > 0)
         {
-            for (string header : requestInfo.requestHeaders)
+            for (const std::string& header : requestInfo.requestHeaders)
             {
-                request_headers = curl_slist_append(request_headers, header.c_str());
+                if(!header.empty())
+                    request_headers = curl_slist_append(request_headers, header.c_str());
             }
 
             curl_easy_setopt(curl, CURLOPT_HTTPHEADER, request_headers);
@@ -94,6 +103,14 @@ cleanup:
  */
 bool HttpClient::PostRequest(__inout HttpRequest& requestInfo)
 {
+    if (requestInfo.url.empty())
+    {
+#ifdef _LOGGING_ENABLED
+        Logger::logf(Warning, "url was empty @  HttpClient::GetRequest");
+#endif
+        return false;
+    }
+
     bool wasSuccess = false;
     CURL* curl = nullptr;
     CURLcode res;
@@ -111,15 +128,17 @@ bool HttpClient::PostRequest(__inout HttpRequest& requestInfo)
 
         if (requestInfo.requestHeaders.size() > 0)
         {
-            for (string header : requestInfo.requestHeaders)
+            for (const std::string& header : requestInfo.requestHeaders)
             {
-                request_headers = curl_slist_append(request_headers, header.c_str());
+                if (!header.empty())
+                    request_headers = curl_slist_append(request_headers, header.c_str());
             }
 
             curl_easy_setopt(curl, CURLOPT_HTTPHEADER, request_headers); //set headers
         }
 
-        curl_easy_setopt(curl, CURLOPT_COOKIE, requestInfo.cookie.c_str()); //set cookie
+        if (!requestInfo.cookie.empty())
+            curl_easy_setopt(curl, CURLOPT_COOKIE, requestInfo.cookie.c_str()); //set cookie
 
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, requestInfo.body.c_str()); //set body
 

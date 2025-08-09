@@ -13,7 +13,7 @@ BOOL Process::CheckParentProcess(__in const wstring desiredParent, __in const bo
     {
         BOOL bFoundValidSignature = FALSE;
 
-        for (DWORD pid : pids)
+        for (const DWORD pid : pids)
         {
             if (parentPid == pid)
             {

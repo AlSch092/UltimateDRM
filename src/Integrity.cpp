@@ -45,11 +45,8 @@ bool Integrity::CompareChecksum(__in const std::string module, __in const char* 
  */
 bool Integrity::CompareChecksumToFileOnDisc(__in const std::wstring& filePath, __in const char* section, __in const uintptr_t loadedImageChecksum)
 {
-	//check checksum of module's file on disc vs. loaded image
-	uintptr_t diskFileChecksum = GetSectionChecksumFromDisc(filePath, section);
-	return (diskFileChecksum == loadedImageChecksum);
+	return (GetSectionChecksumFromDisc(filePath, section) == loadedImageChecksum);
 }
-
 
 /**
  * @brief Thread routine for periodic integrity checks
@@ -110,11 +107,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 #endif
 			for (const auto& hookedIATEntry : hookedIATEntries)
 			{
-				IntegrityViolation IV;
-				IV.module = Utility::ConvertStringToWString(hookedIATEntries.front().AssociatedModuleName);
-				IV.section = L".rdata"; //IAT data is in .rdata
-				IV.address = hookedIATEntry.AddressToFuncPtr;
-				IV.description = L"IAT Hooked";
+				IntegrityViolation IV(Utility::ConvertStringToWString(hookedIATEntries.front().AssociatedModuleName), L".rdata", L"IAT Hooked", hookedIATEntry.AddressToFuncPtr);
 				integrity->AddViolation(IV); //will avoid duplicates
 			}
 		}
@@ -148,10 +141,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 					}			    
 					else
 					{
-						IntegrityViolation IV;
-						IV.module = mod.Name;
-						IV.section = Utility::ConvertStringToWString(section.name);
-						IV.address = (uintptr_t)mod.hMod + section.address; //with the 'quick' checksum method, we can't see the exact offset where the checksum difference occured
+						IntegrityViolation IV(mod.Name, Utility::ConvertStringToWString(section.name), L"", (uintptr_t)mod.hMod + section.address);
 						integrity->AddViolation(IV);
 					}
 				}
@@ -168,10 +158,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 					}
 					else
 					{
-						IntegrityViolation IV;
-						IV.module = mod.Name;
-						IV.section = Utility::ConvertStringToWString(section.name);
-						IV.address = (uintptr_t)mod.hMod + section.address; //with the 'quick' checksum method, we can't see the exact offset where the checksum difference occured
+						IntegrityViolation IV (mod.Name, Utility::ConvertStringToWString(section.name), L"", (uintptr_t)mod.hMod + section.address);
 						integrity->AddViolation(IV);
 					}				
 				}
@@ -188,11 +175,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 					}
 					else
 					{
-						IntegrityViolation IV;
-						IV.module = mod.Name;
-						IV.description = L"page=writable";
-						IV.section = Utility::ConvertStringToWString(section.name);
-						IV.address = (uintptr_t)mod.hMod + section.address; //with the 'quick' checksum method, we can't see the exact offset where the checksum difference occured
+						IntegrityViolation IV(mod.Name, Utility::ConvertStringToWString(section.name), L"page=writable", (uintptr_t)mod.hMod + section.address);
 						integrity->AddViolation(IV);
 					}
 				}
@@ -484,14 +467,10 @@ bool Integrity::IsReturnAddressInModule(__in const uintptr_t RetAddr, __in const
 	HMODULE retBase = 0;
 
 	if (module == nullptr)
-	{
-		retBase = (HMODULE)GetModuleHandleW(NULL);
-	}
+		retBase = (HMODULE)GetModuleHandleW(NULL);	
 	else
-	{
 		retBase = (HMODULE)GetModuleHandleW(module);
-	}
-
+	
 	if (retBase == 0)
 	{
 #ifdef _LOGGING_ENABLED
