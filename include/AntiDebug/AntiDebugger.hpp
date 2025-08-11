@@ -1,6 +1,6 @@
 //By AlSch092 @github
 #pragma once
-
+#include "../DRMViolation.hpp"
 #include "../Settings.hpp"
 #include "../Logger.hpp"
 #include "../Thread.hpp"
@@ -9,6 +9,7 @@
 #include "../XorStr.hpp"
 #include <vector>
 #include <functional>
+#include <mutex>
 
 #define USER_SHARED_DATA ((KUSER_SHARED_DATA * const)0x7FFE0000)
 
@@ -16,6 +17,9 @@ namespace Debugger
 {
     enum DebuggerMethod
     {
+        NONE = 0,
+        EXECUTION_ERROR,
+
         DEBUG_WINAPI_DEBUGGER,
         DEBUG_PEB,
         DEBUG_HARDWARE_REGISTERS,
@@ -32,6 +36,25 @@ namespace Debugger
         DEBUG_PROCESS_DEBUG_FLAGS,
         DEBUG_REMOTE_DEBUGGER,
         DEBUG_DBG_BREAK,
+        DEBUG_KNOWN_DEBUGGER_PROCESS,
+    };
+
+    /**
+     * @brief IntegrityViolation structure tracks anomalies with module integrity
+     */
+    struct DebuggerViolation : public DRMViolation
+    {
+        DebuggerMethod type;
+
+        DebuggerViolation(DebuggerMethod type, std::wstring _description) : type(type)
+        {
+            this->description = _description;
+        }
+
+        bool operator==(const DebuggerViolation& other) const noexcept
+        {
+            return type == other.type && timestamp == other.timestamp;
+        }
     };
 
     /*
@@ -58,21 +81,21 @@ namespace Debugger
 			auto kd_str = make_encrypted(L"kd.exe");
 			auto dbgX_str = make_encrypted(L"DbgX.Shell.exe");
 
-            CommonDebuggerProcesses.push_back(x64Dbg_str.decrypt());
-            CommonDebuggerProcesses.push_back(CE_str.decrypt());
-            CommonDebuggerProcesses.push_back(idaq64_str.decrypt());
-            CommonDebuggerProcesses.push_back(CE_x86_64_str.decrypt());
-            CommonDebuggerProcesses.push_back(kd_str.decrypt());
-            CommonDebuggerProcesses.push_back(dbgX_str.decrypt());
+            this->CommonDebuggerProcesses.push_back(x64Dbg_str.decrypt()); //would be better if we stored them encrypted then decrypted them only when actually used
+            this->CommonDebuggerProcesses.push_back(CE_str.decrypt());     //currently this only makes static reversing a bit harder
+            this->CommonDebuggerProcesses.push_back(idaq64_str.decrypt());
+            this->CommonDebuggerProcesses.push_back(CE_x86_64_str.decrypt());
+            this->CommonDebuggerProcesses.push_back(kd_str.decrypt());
+            this->CommonDebuggerProcesses.push_back(dbgX_str.decrypt());
         }
 
         ~AntiDebug()
         {
-			if (DetectionThread != nullptr)
+			if (this->DetectionThread != nullptr)
 			{
-				DetectionThread->SignalShutdown(TRUE);
-                DetectionThread->JoinThread();
-				DetectionThread.reset();
+                this->DetectionThread->SignalShutdown(TRUE);
+                this->DetectionThread->JoinThread();
+                this->DetectionThread.reset();
 			}
         } 
 
@@ -81,9 +104,9 @@ namespace Debugger
         AntiDebug operator*(AntiDebug& other) = delete;
         AntiDebug operator/(AntiDebug& other) = delete;
         
-        Thread* GetDetectionThread() const  { return this->DetectionThread.get(); }
+        Thread* GetDetectionThread() const noexcept { return this->DetectionThread.get(); }
 
-        Settings* GetSettings() const { return this->Config; }
+        Settings* GetSettings() const noexcept { return this->Config; }
 
         void StartAntiDebugThread();
 
@@ -95,42 +118,60 @@ namespace Debugger
         template<typename Func>
         void AddDetectionFunction(Func func) //define detection functions in the subclass, `DebuggerDetections`, then add them to the list using this func
         {
-            DetectionFunctionList.emplace_back(func);
+            std::lock_guard<std::mutex> lock(this->DetectionRoutineMutex);
+            this->DetectionFunctionList.emplace_back(func);
         }
 
-        bool RunDetectionFunctions()  //run all detection functions
+        void RunDetectionFunctions()  //run all detection functions
         {
-            bool DetectedDebugger = false;
+            std::lock_guard<std::mutex> lock(this->DetectionRoutineMutex);
 
-            for (auto& func : DetectionFunctionList)
+            for (auto& func : this->DetectionFunctionList)
             {
+                DebuggerMethod DetectedDebugger = NONE;
+
                 if (DetectedDebugger = func()) //call the debugger detection method
-                { //...if debugger was found, optionally take further action below (detected flags are already set in each routine, so this block is empty)
+                {
+                    this->AddFlagged(DebuggerViolation{ DetectedDebugger, L"" });
+
+#ifdef _LOGGING_ENABLED
+                    Logger::logf(Info, "Debugger flag detected: %d", DetectedDebugger); //optionally, iterate over DetectedMethods list if you want a more granular logging 
+#endif
                 }
             }
-
-            return DetectedDebugger;
         }
-
+        
         static void _IsHardwareDebuggerPresent(LPVOID AD); //this func needs to run in its own thread, since it suspends all other threads and checks their contexts for DR's with values. its placed in this class since it doesn't fit the correct definition type for our detection function list
 
         bool IsDBK64DriverLoaded();
 
+        std::list<DebuggerViolation> GetDetectedMethods() noexcept
+        { 
+            std::lock_guard<std::mutex> lock(this->FlggedListMutex);
+            return this->DetectedMethods;
+        }
+
     protected:
-        std::vector<std::function<bool()>> DetectionFunctionList; //list of debugger detection methods, which are contained in the subclass `DebuggerDetections`      
+        std::vector<std::function<DebuggerMethod()>> DetectionFunctionList; //list of debugger detection methods, which are contained in the subclass `DebuggerDetections`      
         std::list<std::wstring> CommonDebuggerProcesses;
 
-        void AddFlagged(DebuggerMethod method) { if (std::find(DetectedMethods.begin(), DetectedMethods.end(), method) == DetectedMethods.end()) DetectedMethods.push_back(method); }
-		const std::list<DebuggerMethod>& GetDetectedMethods() { return DetectedMethods; }
-
+        void AddFlagged(const DebuggerViolation& method)
+        { 
+            std::lock_guard<std::mutex> lock(FlggedListMutex);
+            if (std::find(this->DetectedMethods.begin(), this->DetectedMethods.end(), method) == this->DetectedMethods.end())
+                this->DetectedMethods.push_back(method);
+        }
+		
     private:      
 
         std::unique_ptr<Thread> DetectionThread = nullptr; //set in `StartAntiDebugThread`
+        std::list<DebuggerViolation> DetectedMethods; //list of detection routines which are each executed once per loop. must have bool return type with no args
 
         Settings* Config = nullptr;
 
         const std::wstring DBK64Driver = L"DBK64.sys"; //DBVM debugger, this driver loaded and in a running state may likely indicate the presence of dark byte's VM debugger *todo -> add check on this driver*
 
-		std::list<DebuggerMethod> DetectedMethods;
+        std::mutex DetectionRoutineMutex;
+        std::mutex FlggedListMutex;
     };
 }

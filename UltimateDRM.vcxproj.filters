@@ -186,4 +186,9 @@
       <Filter>lib</Filter>
     </Library>
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="include\DRMViolation.hpp">
+      <Filter>include</Filter>
+    </Text>
+  </ItemGroup>
 </Project>

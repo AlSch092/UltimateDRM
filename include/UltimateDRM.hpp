@@ -4,28 +4,8 @@
 
 #include "Settings.hpp"
 #include "DRMException.hpp"
+#include "DRMViolation.hpp"
   
-/**
- * @brief DRMViolation struct tracks memory and resource changes in the runtime environment
- *
- * A list of violations can be queried from the DRM class, allowing non-library classes to see detections
- */
-struct DRMViolation
-{
-	enum Type
-	{
-		Integrity = 1,
-		Debugging,
-		License,
-		CodeSignature,
-	};
-
-	Type type;
-	uintptr_t address;
-	std::wstring description;
-	uint64_t timestamp = 0;
-};
-
 /**
  * @brief The PIMPL idiom hides implementation details for static libraries. The actual implementation and members of the class are in DRM.cpp
  *

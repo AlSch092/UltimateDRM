@@ -2,7 +2,12 @@
 
 using namespace Debugger;
 
-bool DebuggerDetections::_IsKernelDebuggerPresent()
+DebuggerMethod DebuggerDetections::_IsDebuggerPresent()
+{ 
+	return (IsDebuggerPresent() ? DebuggerMethod::DEBUG_WINAPI_DEBUGGER : DebuggerMethod::NONE); 
+}
+
+DebuggerMethod DebuggerDetections::_IsKernelDebuggerPresent()
 {
 	typedef long NTSTATUS;
 	HANDLE hProcess = GetCurrentProcess();
@@ -21,28 +26,27 @@ bool DebuggerDetections::_IsKernelDebuggerPresent()
 #ifdef _LOGGING_ENABLED
 		Logger::logf(Err, "Error fetching module ntdll.dll @ _IsKernelDebuggerPresent: %d", GetLastError());
 #endif
-		return false;
+		return EXECUTION_ERROR;
 	}
 
 	NtQuerySystemInformation = (NT_QUERY_SYSTEM_INFORMATION)GetProcAddress(hModule, "NtQuerySystemInformation");
 	if (NtQuerySystemInformation == NULL)
-		return false;
+		return EXECUTION_ERROR;
 
-	if (!NtQuerySystemInformation(SystemKernelDebuggerInformation, &Info, sizeof(Info), NULL))
+	if (NtQuerySystemInformation(SystemKernelDebuggerInformation, &Info, sizeof(Info), NULL))
 	{
-		if (Info.DebuggerEnabled && !Info.DebuggerNotPresent)
+		if (Info.DebuggerEnabled || !Info.DebuggerNotPresent)
 		{
-			this->AddFlagged(DebuggerMethod::DEBUG_KERNEL_DEBUGGER);
-			return true;
+			return DEBUG_KERNEL_DEBUGGER;
 		}			
-		else
-			return false;
 	}
+	else
+		return EXECUTION_ERROR;
 
-	return false;
+	return NONE;
 }
 
-bool DebuggerDetections::_IsKernelDebuggerPresent_SharedKData()
+DebuggerMethod DebuggerDetections::_IsKernelDebuggerPresent_SharedKData()
 {
 	_KUSER_SHARED_DATA* sharedData = USER_SHARED_DATA;
 	bool bDebuggerEnabled = false;
@@ -50,16 +54,15 @@ bool DebuggerDetections::_IsKernelDebuggerPresent_SharedKData()
 	if (sharedData != nullptr && sharedData->KdDebuggerEnabled)
 	{
 		bDebuggerEnabled = true;
-		this->AddFlagged(DebuggerMethod::DEBUG_KERNEL_DEBUGGER);
 	}
 
-	return bDebuggerEnabled;
+	return bDebuggerEnabled ? DEBUG_KERNEL_DEBUGGER : NONE;
 }
 
 /*
 	_IsDebuggerPresent_HeapFlags - checks heap flags in the PEB, certain combination can indicate a debugger is present
 */
-bool DebuggerDetections::_IsDebuggerPresent_HeapFlags()
+DebuggerMethod DebuggerDetections::_IsDebuggerPresent_HeapFlags()
 {
 #ifdef _M_IX86
 	DWORD_PTR pPeb64 = (DWORD_PTR)__readfsdword(0x30);
@@ -72,31 +75,22 @@ bool DebuggerDetections::_IsDebuggerPresent_HeapFlags()
 		PVOID ptrHeap = (PVOID)*(PDWORD_PTR)((PBYTE)pPeb64 + 0x30);
 		PDWORD heapForceFlagsPtr = (PDWORD)((PBYTE)ptrHeap + 0x74);
 
-		__try
+		if (ptrHeap && heapForceFlagsPtr)
 		{
 			if (*heapForceFlagsPtr >= 0x40000060)
 			{
-				this->AddFlagged(DebuggerMethod::DEBUG_HEAP_FLAG);
-				return true;
+				return DEBUG_HEAP_FLAG;
 			}
-				
-		}
-		__except (EXCEPTION_EXECUTE_HANDLER)
-		{
-#ifdef _LOGGING_ENABLED
-			Logger::logf(Warning, "Failed to dereference heapForceFlagsPtr @ _IsDebuggerPresent_HeapFlags");
-#endif
-			return false;
 		}
 	}
 
-	return false;
+	return NONE;
 }
 
 /*
   _IsDebuggerPresent_CloseHandle - calls CloseHandle with an invalid handle, if an exception is thrown then a debugger is present
 */
-bool DebuggerDetections::_IsDebuggerPresent_CloseHandle()
+DebuggerMethod DebuggerDetections::_IsDebuggerPresent_CloseHandle()
 {
 #ifndef _DEBUG
 	__try
@@ -104,53 +98,33 @@ bool DebuggerDetections::_IsDebuggerPresent_CloseHandle()
 		CloseHandle((HANDLE)1);
 	}
 	__except (EXCEPTION_INVALID_HANDLE == GetExceptionCode() ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
-	{
-		this->AddFlagged(DebuggerMethod::DEBUG_CLOSEHANDLE);
-		return true;
+	{		
+		return DEBUG_CLOSEHANDLE;
 	}
 #endif
-	return false;
+	return NONE;
 }
 
-bool DebuggerDetections::_IsDebuggerPresent_RemoteDebugger()
+DebuggerMethod DebuggerDetections::_IsDebuggerPresent_RemoteDebugger()
 {
 	BOOL bDebugged = false;
+
 	if (CheckRemoteDebuggerPresent(GetCurrentProcess(), &bDebugged))
 	{
 		if (bDebugged)
 		{
-			this->AddFlagged(DebuggerMethod::DEBUG_REMOTE_DEBUGGER);
-			return true;
+			return DEBUG_REMOTE_DEBUGGER;
 		}
 	}
 		
-	return false;
-}
-
-bool DebuggerDetections::_IsDebuggerPresent_DbgBreak()
-{
-#ifdef _DEBUG
-	return false;  //only use __fastfail in release build , since it will trip up our execution when debugging this project
-#else
-	__try
-	{
-		DebugBreak();
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
-	{
-		return false;
-	}
-
-	this->AddFlagged(DebuggerMethod::DEBUG_DBG_BREAK);
-	return true;
-#endif
+	return NONE;
 }
 
 /*
 	_IsDebuggerPresent_VEH - Checks if vehdebug-x86_64.dll is loaded and exporting InitiallizeVEH. If so, the first byte of this routine is patched and the module's internal name is changed to STOP_CHEATING
 	returns true if CE's VEH debugger is found, but this won't stop home-rolled VEH debuggers via APC injection
 */
-bool DebuggerDetections::_IsDebuggerPresent_VEH()
+DebuggerMethod DebuggerDetections::_IsDebuggerPresent_VEH()
 {
 	bool bFound = false;
 
@@ -164,8 +138,6 @@ bool DebuggerDetections::_IsDebuggerPresent_VEH()
 		{
 			bFound = true;
 
-			this->AddFlagged(DebuggerMethod::DEBUG_VEH_DEBUGGER);
-
 			DWORD dwOldProt = 0;
 
 			if (!VirtualProtect((void*)veh_addr, 1, PAGE_EXECUTE_READWRITE, &dwOldProt))
@@ -173,7 +145,7 @@ bool DebuggerDetections::_IsDebuggerPresent_VEH()
 #ifdef _LOGGING_ENABLED
 				Logger::logf(Warning, "VirtualProtect failed @ _IsDebuggerPresent_VEH");
 #endif
-				return true; //return true since we found the routine, even though we can't patch over it. if virtualprotect fails, the program will probably crash if trying to patch it
+				return DEBUG_VEH_DEBUGGER; //return true since we found the routine, even though we can't patch over it. if virtualprotect fails, the program will probably crash if trying to patch it
 			}
 
 			memcpy((void*)veh_addr, "\xC3", sizeof(BYTE)); //patch first byte of `InitializeVEH` with a ret, stops call to InitializeVEH from succeeding.
@@ -187,14 +159,14 @@ bool DebuggerDetections::_IsDebuggerPresent_VEH()
 		}
 	}
 
-	return bFound;
+	return (bFound ? DEBUG_VEH_DEBUGGER : NONE);
 }
 
 /*
      _IsDebuggerPresent_PEB - checks the PEB for the BeingDebugged flag
      returns `true` if byte is set to 1, indicating a debugger is present
 */
-bool DebuggerDetections::_IsDebuggerPresent_PEB()
+DebuggerMethod DebuggerDetections::_IsDebuggerPresent_PEB()
 {
 #ifdef _M_IX86
 	MYPEB* _PEB = (MYPEB*)__readfsdword(0x30);
@@ -206,17 +178,16 @@ bool DebuggerDetections::_IsDebuggerPresent_PEB()
 
 	if (_PEB != nullptr && _PEB->BeingDebugged)
 	{
-		this->AddFlagged(DebuggerMethod::DEBUG_PEB);
 		bDebuggerPresent = true;
 	}
 
-	return bDebuggerPresent;
+	return (bDebuggerPresent ? DEBUG_PEB : NONE);
 }
 
 /*
 	_IsDebuggerPresent_DebugPort - calls NtQueryInformationProcess with PROCESS_INFORMATION_CLASS 0x07 to check for debuggers
 */
-bool DebuggerDetections::_IsDebuggerPresent_DebugPort()
+DebuggerMethod DebuggerDetections::_IsDebuggerPresent_DebugPort()
 {
 	typedef NTSTATUS(NTAPI* TNtQueryInformationProcess)(IN HANDLE ProcessHandle, IN PROCESS_INFORMATION_CLASS ProcessInformationClass, OUT PVOID ProcessInformation, IN ULONG ProcessInformationLength, OUT PULONG ReturnLength);
 
@@ -234,8 +205,7 @@ bool DebuggerDetections::_IsDebuggerPresent_DebugPort()
 
 			if (NT_SUCCESS(status) && (dwProcessDebugPort == -1))
 			{
-				this->AddFlagged(DebuggerMethod::DEBUG_DEBUG_PORT);
-				return true;
+				return DEBUG_DEBUG_PORT;
 			}				
 		}
 		else
@@ -243,6 +213,7 @@ bool DebuggerDetections::_IsDebuggerPresent_DebugPort()
 #ifdef _LOGGING_ENABLED
 			Logger::logf(Warning, "Failed to fetch NtQueryInformationProcess address @ _IsDebuggerPresent_DebugPort ");
 #endif
+			return EXECUTION_ERROR;
 		}
 	}
 	else
@@ -250,15 +221,16 @@ bool DebuggerDetections::_IsDebuggerPresent_DebugPort()
 #ifdef _LOGGING_ENABLED
 		Logger::logf(Warning, "Failed to fetch ntdll.dll address @ _IsDebuggerPresent_DebugPort ");
 #endif
+		return EXECUTION_ERROR;
 	}
 
-	return false;
+	return NONE;
 }
 
 /*
 	_IsDebuggerPresent_ProcessDebugFlags - calls NtQueryInformationProcess with PROCESS_INFORMATION_CLASS 0x1F to check for debuggers
 */
-bool DebuggerDetections::_IsDebuggerPresent_ProcessDebugFlags()
+DebuggerMethod DebuggerDetections::_IsDebuggerPresent_ProcessDebugFlags()
 {
 	typedef NTSTATUS(NTAPI* TNtQueryInformationProcess)(IN HANDLE ProcessHandle, IN PROCESS_INFORMATION_CLASS ProcessInformationClass, OUT PVOID ProcessInformation, IN ULONG ProcessInformationLength, OUT PULONG ReturnLength);
 
@@ -276,8 +248,7 @@ bool DebuggerDetections::_IsDebuggerPresent_ProcessDebugFlags()
 
 			if (NT_SUCCESS(status) && (dwProcessDebugFlags == 0))
 			{
-				this->AddFlagged(DebuggerMethod::DEBUG_PROCESS_DEBUG_FLAGS);
-				return true;
+				return DEBUG_PROCESS_DEBUG_FLAGS;
 			}			
 		}
 	}
@@ -287,7 +258,8 @@ bool DebuggerDetections::_IsDebuggerPresent_ProcessDebugFlags()
 		Logger::logf(Warning, "Failed to fetch ntdll.dll address @ _IsDebuggerPresent_ProcessDebugFlags ");
 #endif
 	}
-	return false;
+
+	return NONE;
 }
 
 
@@ -295,7 +267,7 @@ bool DebuggerDetections::_IsDebuggerPresent_ProcessDebugFlags()
 	_ExitCommonDebuggers - create remote thread on `ExitProcess` in any common debugger processes
 	This can of course be bypassed with a simple process name change, preferrably we would use a combination of artifacts to find these processes
 */
-bool DebuggerDetections::_ExitCommonDebuggers()
+DebuggerMethod DebuggerDetections::_ExitCommonDebuggers()
 {
 	bool triedEndDebugger = false;
 
@@ -312,7 +284,7 @@ bool DebuggerDetections::_ExitCommonDebuggers()
 #ifdef _LOGGING_ENABLED
 				Logger::logf(Warning, "Failed to fetch kernel32.dll address @ _ExitCommonDebuggers ");
 #endif
-				return false;
+				return EXECUTION_ERROR;
 			}
 
 			uintptr_t ExitProcessAddr = (uintptr_t)GetProcAddress((HMODULE)K32Base, "ExitProcess");
@@ -322,7 +294,7 @@ bool DebuggerDetections::_ExitCommonDebuggers()
 #ifdef _LOGGING_ENABLED
 				Logger::logf(Warning, "Failed to fetch ExitProcess address @ _ExitCommonDebuggers ");
 #endif
-				return false;
+				return EXECUTION_ERROR;
 			}
 
 			uintptr_t ExitProcessOffset = ExitProcessAddr - K32Base;
@@ -348,6 +320,6 @@ bool DebuggerDetections::_ExitCommonDebuggers()
 		}
 	}
 
-	return triedEndDebugger;
+	return (triedEndDebugger ? DEBUG_KNOWN_DEBUGGER_PROCESS : NONE);
 }
 

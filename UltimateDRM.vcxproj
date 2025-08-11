@@ -75,6 +75,9 @@
     <Library Include="lib\zlib.lib" />
     <Library Include="lib\zlibd.lib" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="include\DRMViolation.hpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>

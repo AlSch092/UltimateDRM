@@ -1,5 +1,5 @@
 # Changelog - UltimateDRM  
-
+- Aug 11 2025: Improved anti-debugger class, added inheritance with 'violations' struct, general improvements  
 - Aug 7 2025: Added DRM violation lists, bug fixes and more testing  
 - Aug 6 2025: Added IAT hook checks for all loaded modules  
 - Aug 5 2025:  Finished integrity checks on all non-writable sections of all modules  

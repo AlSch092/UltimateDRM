@@ -62,29 +62,14 @@ void Debugger::AntiDebug::CheckForDebugger(LPVOID AD)
 			return; //exit thread
 		}
 
-		HANDLE CheckHardwareRegistersThread = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)_IsHardwareDebuggerPresent, (LPVOID)AntiDbg, 0, 0);
+		std::thread CheckHardwareRegistersThread = std::thread(&_IsHardwareDebuggerPresent, AntiDbg);
+		CheckHardwareRegistersThread.detach();
 
-		if (CheckHardwareRegistersThread == INVALID_HANDLE_VALUE || CheckHardwareRegistersThread == NULL)
-		{
-#ifdef _LOGGING_ENABLED
-			Logger::logf(Warning, "Failed to create new thread to call _IsHardwareDebuggerPresent: %d", GetLastError());
-#endif
-		}
-		else
-		{
-			WaitForSingleObject(CheckHardwareRegistersThread, 2000); //Shouldn't take more than 2000ms to call _IsHardwareDebuggerPresent
-		}
-
-		if (AntiDbg->RunDetectionFunctions())
-		{
-#ifdef _LOGGING_ENABLED
-			Logger::logf(Info, "Atleast one debugger detection function caught a debugger!"); //optionally, iterate over DetectedMethods list if you want a more granular logging 
-#endif
-		}
+		AntiDbg->RunDetectionFunctions();
 
 		if (AntiDbg->IsDBK64DriverLoaded())
 		{
-			AntiDbg->AddFlagged(DebuggerMethod::DEBUG_DBK64_DRIVER);
+			AntiDbg->AddFlagged(DebuggerViolation{ DebuggerMethod::DEBUG_DBK64_DRIVER, L"" });
 		}
 
 		this_thread::sleep_for(std::chrono::milliseconds(MonitorLoopDelayMS)); //ease the CPU a bit
@@ -150,7 +135,7 @@ void Debugger::AntiDebug::_IsHardwareDebuggerPresent(LPVOID AD)
 #endif
 						ResumeThread(hThread);
 
-						AntiDbg->AddFlagged(DebuggerMethod::DEBUG_HARDWARE_REGISTERS);
+						AntiDbg->AddFlagged(DebuggerViolation{ DebuggerMethod::DEBUG_HARDWARE_REGISTERS, L"" });
 
 						CloseHandle(hThreadSnap);
 						CloseHandle(hThread);

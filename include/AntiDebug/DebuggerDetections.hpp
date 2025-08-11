@@ -1,6 +1,8 @@
 #pragma once
 #include "AntiDebugger.hpp"
 
+using namespace Debugger;
+
 class DebuggerDetections final  : public Debugger::AntiDebug
 {
 public:
@@ -8,30 +10,28 @@ public:
     {
         HideAllThreadsFromDebugger();
         
-        AddDetectionFunction([this]() -> bool { return _IsDebuggerPresent(); });
-        AddDetectionFunction([this]() -> bool { return _IsDebuggerPresent_HeapFlags(); });
-        AddDetectionFunction([this]() -> bool { return _IsDebuggerPresent_CloseHandle(); });
-        AddDetectionFunction([this]() -> bool { return _IsDebuggerPresent_RemoteDebugger(); });
-        AddDetectionFunction([this]() -> bool { return _IsDebuggerPresent_VEH(); });
-        AddDetectionFunction([this]() -> bool { return _IsDebuggerPresent_DbgBreak(); });
-        AddDetectionFunction([this]() -> bool { return _IsDebuggerPresent_PEB(); });
-        AddDetectionFunction([this]() -> bool { return _IsDebuggerPresent_DebugPort(); });
-        AddDetectionFunction([this]() -> bool { return _IsDebuggerPresent_ProcessDebugFlags(); });
-        AddDetectionFunction([this]() -> bool { return _IsKernelDebuggerPresent(); });
-        AddDetectionFunction([this]() -> bool { return _IsKernelDebuggerPresent_SharedKData(); });
-        //AddDetectionFunction([this]() -> bool { return _ExitCommonDebuggers(); });
+        AddDetectionFunction([this]() -> DebuggerMethod { return _IsDebuggerPresent(); });
+        AddDetectionFunction([this]() -> DebuggerMethod { return _IsDebuggerPresent_HeapFlags(); });
+        AddDetectionFunction([this]() -> DebuggerMethod { return _IsDebuggerPresent_CloseHandle(); });
+        AddDetectionFunction([this]() -> DebuggerMethod { return _IsDebuggerPresent_RemoteDebugger(); });
+        AddDetectionFunction([this]() -> DebuggerMethod { return _IsDebuggerPresent_VEH(); });
+        AddDetectionFunction([this]() -> DebuggerMethod { return _IsDebuggerPresent_PEB(); });
+        AddDetectionFunction([this]() -> DebuggerMethod { return _IsDebuggerPresent_DebugPort(); });
+        AddDetectionFunction([this]() -> DebuggerMethod { return _IsDebuggerPresent_ProcessDebugFlags(); });
+        AddDetectionFunction([this]() -> DebuggerMethod { return _IsKernelDebuggerPresent(); });
+        AddDetectionFunction([this]() -> DebuggerMethod { return _IsKernelDebuggerPresent_SharedKData(); });
+        //AddDetectionFunction([this]() -> DebuggerMethod { return _ExitCommonDebuggers(); });
     }
 
-    bool _IsDebuggerPresent() { return IsDebuggerPresent(); }
-    bool _IsDebuggerPresent_HeapFlags();
-    bool _IsDebuggerPresent_CloseHandle();
-    bool _IsDebuggerPresent_RemoteDebugger();
-    bool _IsDebuggerPresent_VEH();
-    bool _IsDebuggerPresent_DbgBreak();
-    bool _IsDebuggerPresent_PEB();
-    bool _IsDebuggerPresent_DebugPort();
-    bool _IsDebuggerPresent_ProcessDebugFlags();
-    bool _IsKernelDebuggerPresent();
-    bool _IsKernelDebuggerPresent_SharedKData();
-    bool _ExitCommonDebuggers(); //call ExitProcess in a remote thread on common debuggers
+    DebuggerMethod _IsDebuggerPresent();
+    DebuggerMethod _IsDebuggerPresent_HeapFlags();
+    DebuggerMethod _IsDebuggerPresent_CloseHandle();
+    DebuggerMethod _IsDebuggerPresent_RemoteDebugger();
+    DebuggerMethod _IsDebuggerPresent_VEH();
+    DebuggerMethod _IsDebuggerPresent_PEB();
+    DebuggerMethod _IsDebuggerPresent_DebugPort();
+    DebuggerMethod _IsDebuggerPresent_ProcessDebugFlags();
+    DebuggerMethod _IsKernelDebuggerPresent();
+    DebuggerMethod _IsKernelDebuggerPresent_SharedKData();
+    DebuggerMethod _ExitCommonDebuggers(); //call ExitProcess in a remote thread on common debuggers
 };

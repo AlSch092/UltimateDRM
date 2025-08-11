@@ -1,5 +1,5 @@
 #pragma once
-#include <stdint.h>
+#include "DRMViolation.hpp"
 #include "Process.hpp"
 #include "Thread.hpp"
 #include "Settings.hpp"
@@ -9,17 +9,16 @@
 /**
  * @brief IntegrityViolation structure tracks anomalies with module integrity
  */
-struct IntegrityViolation
+struct IntegrityViolation : public DRMViolation
 {
 	std::wstring module;
 	std::wstring section;
-	std::wstring description;
-	uintptr_t address = 0;
-	uint64_t timestamp = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 
 	IntegrityViolation(std::wstring _module, std::wstring _section, std::wstring _description, uintptr_t _address)
-		: module(_module), section(_section), description(_description), address(_address)
+		: module(_module), section(_section)
 	{
+		this->description = _description;
+		this->address = _address;
 	}
 
 	bool operator==(const IntegrityViolation& other) const noexcept

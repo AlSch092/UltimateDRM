@@ -142,15 +142,23 @@ std::vector<DRMViolation> UltimateDRM::GetViolations() const noexcept
 	if (this->pImpl == nullptr || this->pImpl->IntegrityChecker == nullptr)
 		return {};
 
-	auto integrityViolations = this->pImpl->IntegrityChecker->GetViolations();
+	auto IntegrityViolations = this->pImpl->IntegrityChecker.get()->GetViolations();
+
+	auto DebuggerViolations = this->pImpl->AntiDebugger.get()->GetDetectedMethods();
 
 	{
-		std::lock_guard<std::mutex>  lock(this->pImpl->IntegrityChecker->ViolationsMutex);
+		std::lock_guard<std::mutex> lock(this->pImpl->IntegrityChecker->ViolationsMutex);
 		//fetch violation list from integrityChecker, antidebugger, etc, copy to a returned list
-		for (const auto& integrityViolation : integrityViolations)
+		for (const auto& integrityViolation : IntegrityViolations)
 		{
 			violationList.emplace_back(DRMViolation{ DRMViolation::Type::Integrity, integrityViolation.address,  integrityViolation.description, integrityViolation.timestamp });
 		}
+
+		for (const auto& debugViolation : DebuggerViolations)
+		{
+			violationList.emplace_back(DRMViolation{ DRMViolation::Type::Debugging, 0, 0, 0 });
+		}
+
 	}
 
 	return violationList;
