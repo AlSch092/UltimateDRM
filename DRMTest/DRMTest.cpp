@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <Windows.h>
+#include <fstream>
 #include "../include/UltimateDRM.hpp"
 
 #ifdef _M_X64
@@ -13,7 +14,7 @@
 #endif
 #else
 #ifdef _RELEASE
-#pragma comment(lib, "../Debug/UltimateDRM.libUltimateDRM-d.lib")
+#pragma comment(lib, "../Debug/UltimateDRM.lib")
 #else
 #pragma comment(lib, "../Release/UltimateDRM.lib")
 #endif
@@ -46,9 +47,10 @@ int main(int argc, char** argv)
 
 	std::list<std::wstring> lAllowedParents = { L"steam.exe", L"explorer.exe", L"VsDebugConsole.exe", L"powershell.exe", L"pwsh.exe", L"cmd.exe" };
 
-	const std::string LicenseServerEndpoint = "https://example.com/api/license"; //replace with your actual license server endpoint
+	const std::string LicenseServerEndpoint = "http://localhost:5002/Verify"; //replace with your actual license server endpoint
+	const std::string LicenseFilePath = "license.jwt"; //path to license file
 	const bool bAllowOfflineUsage = true;
-	const bool bUsingLicensing = false;
+	const bool bUsingLicensing = true;
 	const bool bEnforceHypervisorCheck = false; //having this set to true will cause Github Actions tests to fail, since they run on a VM
 	const bool bRequireCodeSigning = false; //in production code, this should be set to true
 	const bool bShutdownOnViolation = false; //throws runtime error if integrity violation is found
@@ -60,7 +62,7 @@ int main(int argc, char** argv)
 	const bool bCheckHypervisor = true;
 	const bool bForceRunAsAdmin = false;
 
-	Settings* s = new Settings(LicenseServerEndpoint, bShutdownOnViolation, bAllowOfflineUsage, bUsingLicensing, bRequireCodeSigning, bEnforceSecureBoot,
+	DRMSettings* s = new DRMSettings(LicenseServerEndpoint, bShutdownOnViolation, bAllowOfflineUsage, bUsingLicensing, bRequireCodeSigning, bEnforceSecureBoot,
 		bEnforceDSE, bEnforceNoKdb, bUseAntiDebugging, bCheckModulesIntegrity, bCheckHypervisor, bForceRunAsAdmin, lAllowedParents);
 
 	UltimateDRM* drm = new UltimateDRM(s);
@@ -86,6 +88,27 @@ int main(int argc, char** argv)
 	{
 		std::cerr << "DRM Exception occurred: " << ex.what() << std::endl;
 		return 3;
+	}
+
+	std::string licenseJWTString;
+	std::string line;
+	std::ifstream licenseFile(LicenseFilePath);
+
+	while (std::getline(licenseFile, line))
+	{
+		licenseJWTString += line;
+	}
+
+	if(licenseFile.is_open())
+	    licenseFile.close();
+
+	if (drm->CheckLicenseVerified(licenseJWTString, bAllowOfflineUsage))
+	{
+		printf("License OK\n");
+	}
+	else
+	{
+		printf("License fail\n");
 	}
 
 	DWORD dwOldProt = 0;
@@ -115,10 +138,18 @@ int main(int argc, char** argv)
 
 	const HMODULE k32hMod = GetModuleHandleW(L"kernel32.dll");
 	const uintptr_t	k32_text = GetSectionStart(k32hMod, ".text");
+
+	const HMODULE wintrustMod = GetModuleHandleW(L"wintrust.dll");
+	const uintptr_t	wintrust_text = GetSectionStart(wintrustMod, ".text");
 	
 	if (k32_text && VirtualProtect((LPVOID)k32_text, 1024, PAGE_EXECUTE_READWRITE, &dwOldProt))
 	{
 		*(uint8_t*)k32_text = 0xC3; //patch over k32's .text section to show integrity checks work
+	}
+
+	if (wintrust_text && VirtualProtect((LPVOID)wintrust_text, 1024, PAGE_EXECUTE_READWRITE, &dwOldProt))
+	{
+		*(uint8_t*)wintrust_text = 0xC3; //patch over k32's .text section to show integrity checks work
 	}
 
 	for (int i = 0; i < 10; i++)
