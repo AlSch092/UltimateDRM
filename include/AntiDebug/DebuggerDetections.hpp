@@ -6,10 +6,12 @@ using namespace Debugger;
 class DebuggerDetections final  : public Debugger::AntiDebug
 {
 public:
-    DebuggerDetections(Settings* s) : Debugger::AntiDebug(s)
+    DebuggerDetections(DRMSettings* s) : Debugger::AntiDebug(s)
     {
-        HideAllThreadsFromDebugger();
-        
+//#ifndef _DEBUG //VS debugger messes up if threads get hidden from it
+//        HideAllThreadsFromDebugger();
+//#endif
+
         AddDetectionFunction([this]() -> DebuggerMethod { return _IsDebuggerPresent(); });
         AddDetectionFunction([this]() -> DebuggerMethod { return _IsDebuggerPresent_HeapFlags(); });
         AddDetectionFunction([this]() -> DebuggerMethod { return _IsDebuggerPresent_CloseHandle(); });

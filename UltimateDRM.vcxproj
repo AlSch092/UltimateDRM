@@ -48,6 +48,8 @@
     <ClInclude Include="include\curl\urlapi.h" />
     <ClInclude Include="include\curl\websockets.h" />
     <ClInclude Include="include\Definitions.hpp" />
+    <ClInclude Include="include\EventLog.hpp" />
+    <ClInclude Include="include\License.hpp" />
     <ClInclude Include="include\UltimateDRM.hpp" />
     <ClInclude Include="include\DRMException.hpp" />
     <ClInclude Include="include\HttpClient.hpp" />
@@ -61,7 +63,7 @@
     <ClInclude Include="include\Process.hpp" />
     <ClInclude Include="include\remap.hpp" />
     <ClInclude Include="include\Services.hpp" />
-    <ClInclude Include="include\Settings.hpp" />
+    <ClInclude Include="include\DRMSettings.hpp" />
     <ClInclude Include="include\Thread.hpp" />
     <ClInclude Include="include\Utility.hpp" />
     <ClInclude Include="include\XorStr.hpp" />
@@ -214,7 +216,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalDependencies>ntdll.lib;wintrust.lib;crypt32.lib;ws2_32.lib;lib/zlib.lib;lib/libcurl.lib;lib/brotlicommon.lib;lib/brotlidec.lib;lib/brotlienc.lib</AdditionalDependencies>
+      <AdditionalDependencies>ntdll.lib;wintrust.lib;crypt32.lib;lib/zlib.lib;lib/libcurl.lib;lib/brotlicommon.lib;lib/brotlidec.lib;lib/brotlienc.lib</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

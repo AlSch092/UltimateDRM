@@ -66,7 +66,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\Settings.hpp">
+    <ClInclude Include="include\DRMSettings.hpp">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="include\Logger.hpp">
@@ -161,6 +161,12 @@
     </ClInclude>
     <ClInclude Include="include\AntiDebug\DebuggerDetections.hpp">
       <Filter>include\AntiDebug</Filter>
+    </ClInclude>
+    <ClInclude Include="include\EventLog.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\License.hpp">
+      <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -108,7 +108,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 			for (const auto& hookedIATEntry : hookedIATEntries)
 			{
 				IntegrityViolation IV(Utility::ConvertStringToWString(hookedIATEntries.front().AssociatedModuleName), L".rdata", L"IAT Hooked", hookedIATEntry.AddressToFuncPtr);
-				integrity->AddViolation(IV); //will avoid duplicates
+				integrity->AddViolation(IV, integrity->bLogViolationsToEventLog); //will avoid duplicates
 			}
 		}
 
@@ -142,7 +142,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 					else
 					{
 						IntegrityViolation IV(mod.Name, Utility::ConvertStringToWString(section.name), L"", (uintptr_t)mod.hMod + section.address);
-						integrity->AddViolation(IV);
+						integrity->AddViolation(IV, integrity->bLogViolationsToEventLog);
 					}
 				}
 
@@ -159,7 +159,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 					else
 					{
 						IntegrityViolation IV (mod.Name, Utility::ConvertStringToWString(section.name), L"", (uintptr_t)mod.hMod + section.address);
-						integrity->AddViolation(IV);
+						integrity->AddViolation(IV, integrity->bLogViolationsToEventLog);
 					}				
 				}
 
@@ -176,7 +176,7 @@ void Integrity::PeriodicIntegrityCheck(LPVOID classThisPtr)
 					else
 					{
 						IntegrityViolation IV(mod.Name, Utility::ConvertStringToWString(section.name), L"page=writable", (uintptr_t)mod.hMod + section.address);
-						integrity->AddViolation(IV);
+						integrity->AddViolation(IV, integrity->bLogViolationsToEventLog);
 					}
 				}
 #endif

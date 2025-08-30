@@ -1,4 +1,5 @@
 # Changelog - UltimateDRM  
+- Aug 30 2025: Added offline license generation & checking (.jwt b64 encoded file), use openssl to generate a keypair + use scripts found in `License` folder  
 - Aug 11 2025: Improved anti-debugger class, added inheritance with 'violations' struct, general improvements  
 - Aug 7 2025: Added DRM violation lists, bug fixes and more testing  
 - Aug 6 2025: Added IAT hook checks for all loaded modules  

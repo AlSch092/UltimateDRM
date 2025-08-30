@@ -1,10 +1,10 @@
 //By AlSch092 @github
 #pragma once
+#include "curl/curl.h"
+#include "curl/easy.h"
 #include <iostream>
 #include <string>
 #include <vector>
-#include "curl/curl.h"
-#include "curl/easy.h"
 #include "Logger.hpp"
 
 using namespace std;

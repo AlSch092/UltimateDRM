@@ -1,7 +1,7 @@
 //By AlSch092 @github
 #pragma once
 #include "../DRMViolation.hpp"
-#include "../Settings.hpp"
+#include "../DRMSettings.hpp"
 #include "../Logger.hpp"
 #include "../Thread.hpp"
 #include "../Definitions.hpp"
@@ -17,26 +17,27 @@ namespace Debugger
 {
     enum DebuggerMethod
     {
-        NONE = 0,
+        NONE = 0, //to keep consistent with other files which include all detections, not just debugger (DetectionFlags.hpp or similar from other projects)
+        UNKNOWN,
         EXECUTION_ERROR,
 
-        DEBUG_WINAPI_DEBUGGER,
+        DEBUG_WINAPI_DEBUGGER = 10000, 
         DEBUG_PEB,
         DEBUG_HARDWARE_REGISTERS,
         DEBUG_HEAP_FLAG,
         DEBUG_INT3,
         DEBUG_INT2C,
+        DEBUG_INT2D,
         DEBUG_CLOSEHANDLE,
         DEBUG_DEBUG_OBJECT,
         DEBUG_VEH_DEBUGGER,
-        DEBUG_DBK64_DRIVER,
         DEBUG_KERNEL_DEBUGGER,
         DEBUG_TRAP_FLAG,
         DEBUG_DEBUG_PORT,
         DEBUG_PROCESS_DEBUG_FLAGS,
         DEBUG_REMOTE_DEBUGGER,
-        DEBUG_DBG_BREAK,
-        DEBUG_KNOWN_DEBUGGER_PROCESS,
+        DEBUG_DBK64_DRIVER,
+        DEBUG_KNOWN_DEBUGGER_PROCESS
     };
 
     /**
@@ -65,12 +66,12 @@ namespace Debugger
     {
     public:
         
-        AntiDebug(Settings* s) : Config(s)
+        AntiDebug(DRMSettings* s) : Config(s)
         {
             if (s == nullptr)
             {
 #ifdef _LOGGING_ENABLED
-                Logger::logf(Warning, "Settings object pointer was somehow nullptr, unknown behavior may take place @ AntiDebug::AntiDebug()");
+                Logger::logf(Warning, "Settings object pointer was somehow nullptr, unknown behavior might take place @ AntiDebug::AntiDebug()");
 #endif
             }
 
@@ -106,7 +107,7 @@ namespace Debugger
         
         Thread* GetDetectionThread() const noexcept { return this->DetectionThread.get(); }
 
-        Settings* GetSettings() const noexcept { return this->Config; }
+        DRMSettings* GetSettings() const noexcept { return this->Config; }
 
         void StartAntiDebugThread();
 
@@ -145,10 +146,16 @@ namespace Debugger
 
         bool IsDBK64DriverLoaded();
 
-        std::list<DebuggerViolation> GetDetectedMethods() noexcept
+        std::vector<DebuggerViolation> GetDetectedMethods()
         { 
-            std::lock_guard<std::mutex> lock(this->FlggedListMutex);
-            return this->DetectedMethods;
+            std::vector<DebuggerViolation> DetectedMethodsCpy;
+
+            {
+                std::lock_guard<std::mutex> lock(FlaggedListMutex);
+                DetectedMethodsCpy = this->DetectedMethods;
+            }
+
+            return DetectedMethodsCpy;
         }
 
     protected:
@@ -157,7 +164,7 @@ namespace Debugger
 
         void AddFlagged(const DebuggerViolation& method)
         { 
-            std::lock_guard<std::mutex> lock(FlggedListMutex);
+            std::lock_guard<std::mutex> lock(FlaggedListMutex);
             if (std::find(this->DetectedMethods.begin(), this->DetectedMethods.end(), method) == this->DetectedMethods.end())
                 this->DetectedMethods.push_back(method);
         }
@@ -165,13 +172,13 @@ namespace Debugger
     private:      
 
         std::unique_ptr<Thread> DetectionThread = nullptr; //set in `StartAntiDebugThread`
-        std::list<DebuggerViolation> DetectedMethods; //list of detection routines which are each executed once per loop. must have bool return type with no args
+        std::vector<DebuggerViolation> DetectedMethods; //list of detection routines which are each executed once per loop. must have bool return type with no args
 
-        Settings* Config = nullptr;
+        DRMSettings* Config = nullptr;
 
         const std::wstring DBK64Driver = L"DBK64.sys"; //DBVM debugger, this driver loaded and in a running state may likely indicate the presence of dark byte's VM debugger *todo -> add check on this driver*
 
         std::mutex DetectionRoutineMutex;
-        std::mutex FlggedListMutex;
+        std::mutex FlaggedListMutex;
     };
 }

@@ -107,7 +107,7 @@ DebuggerMethod DebuggerDetections::_IsDebuggerPresent_CloseHandle()
 
 DebuggerMethod DebuggerDetections::_IsDebuggerPresent_RemoteDebugger()
 {
-	BOOL bDebugged = false;
+	BOOL bDebugged = FALSE;
 
 	if (CheckRemoteDebuggerPresent(GetCurrentProcess(), &bDebugged))
 	{
@@ -257,6 +257,7 @@ DebuggerMethod DebuggerDetections::_IsDebuggerPresent_ProcessDebugFlags()
 #ifdef _LOGGING_ENABLED
 		Logger::logf(Warning, "Failed to fetch ntdll.dll address @ _IsDebuggerPresent_ProcessDebugFlags ");
 #endif
+		return EXECUTION_ERROR;
 	}
 
 	return NONE;
@@ -301,7 +302,7 @@ DebuggerMethod DebuggerDetections::_ExitCommonDebuggers()
 
 			HANDLE remoteProcHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
 
-			if (remoteProcHandle)
+			if (remoteProcHandle != INVALID_HANDLE_VALUE && remoteProcHandle != 0)
 			{
 				uintptr_t FunctionAddr_ExitProcess = (uintptr_t)Process::GetRemoteModuleBaseAddress(pid, L"kernel32.dll") + ExitProcessOffset;
 				HANDLE RemoteThread = CreateRemoteThread(remoteProcHandle, 0, 0, (LPTHREAD_START_ROUTINE)FunctionAddr_ExitProcess, 0, 0, 0);

@@ -1,8 +1,10 @@
 #pragma once
 #include "DRMViolation.hpp"
+#include "EventLog.hpp"
+#include "XorStr.hpp"
 #include "Process.hpp"
 #include "Thread.hpp"
-#include "Settings.hpp"
+#include "DRMSettings.hpp"
 #include <mutex>
 #include <unordered_map>
 
@@ -17,6 +19,7 @@ struct IntegrityViolation : public DRMViolation
 	IntegrityViolation(std::wstring _module, std::wstring _section, std::wstring _description, uintptr_t _address)
 		: module(_module), section(_section)
 	{
+		this->type = DRMViolation::Integrity;
 		this->description = _description;
 		this->address = _address;
 	}
@@ -52,7 +55,7 @@ class Integrity final
 {
 public:
 
-	Integrity(Settings* s) : Config(s)
+	Integrity(DRMSettings* s) : Config(s)
 	{
 		if (s == nullptr)
 		{
@@ -109,7 +112,7 @@ public:
 	static std::list<ProcessData::ImportFunction> FetchHookedIATEntries();
 	static bool DoesIATContainHooked();
 
-	void StoreModuleChecksum(ModuleChecksumData module) 
+	void StoreModuleChecksum(__in const ModuleChecksumData& module) 
 	{
 		auto it = std::find_if(this->ModuleChecksums.begin(), this->ModuleChecksums.end(), [module](const ModuleChecksumData& m) { return (module.hMod == m.hMod); });
 		
@@ -131,14 +134,44 @@ public:
 		return it->SectionChecksums.at(std::string(section));
 	}
 
-	auto GetViolations() const noexcept
+	std::vector<IntegrityViolation> GetViolations() const noexcept
 	{ 
-		std::lock_guard<std::mutex> lock(ViolationsMutex);
-		return this->Violations; 
+		std::vector<IntegrityViolation> ViolationsListCpy;
+		{
+			std::lock_guard<std::mutex> lock(ViolationsMutex);
+			ViolationsListCpy = this->Violations;
+		}
+
+		return ViolationsListCpy;
 	}
 
-	void AddViolation(const IntegrityViolation& iv)
+	void AddViolation(__in const IntegrityViolation& iv, __in const bool bLogToEventLog)
 	{
+		if (bLogToEventLog)
+		{
+			EventLog log(L"UDRM");
+			
+			std::wstring fullEventMsg;
+
+			if (iv.type == DRMViolation::Type::Integrity)
+			{
+				constexpr auto eventMsg = make_encrypted(L"Integrity violation: ");
+				fullEventMsg = eventMsg.decrypt() + iv.description;
+			}
+			else if (iv.type == DRMViolation::Type::Debugging)
+			{
+				constexpr auto eventMsg = make_encrypted(L"Debugging violation: ");
+				fullEventMsg = eventMsg.decrypt() + iv.description;
+			}
+			else if (iv.type == DRMViolation::Type::License)
+			{
+				constexpr auto eventMsg = make_encrypted(L"License violation: ");
+				fullEventMsg = eventMsg.decrypt() + iv.description;
+			}
+
+			log.error(fullEventMsg);
+		}
+
 		std::lock_guard<std::mutex>  lock(ViolationsMutex);
 		if (std::find(Violations.begin(), Violations.end(), iv) == Violations.end())
 			Violations.push_back(iv);
@@ -156,8 +189,10 @@ private:
 
 	static void PeriodicIntegrityCheck(LPVOID thisClassPtr); //performs periodic integrity checks on the process and its modules
 
-	Settings* Config = nullptr; //non-owning pointer; do not delete at class destruction. 
+	DRMSettings* Config = nullptr; //non-owning pointer; do not delete at class destruction. 
 
 	std::vector<IntegrityViolation> Violations;
+
+	bool bLogViolationsToEventLog = true;
 
 };

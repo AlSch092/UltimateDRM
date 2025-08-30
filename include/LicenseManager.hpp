@@ -1,6 +1,6 @@
 #pragma once
 #include "HttpClient.hpp"
-#include <windows.h>
+#include "License.hpp"
 #include <wincrypt.h>
 #include <bcrypt.h>
 #include <fstream>
@@ -10,25 +10,39 @@
 
 #pragma comment(lib, "bcrypt.lib")
 
+
 class LicenseManager final //Not finished yet
 {
 public:
 	LicenseManager(std::string LicenseServerEndpoint, bool bAllowOfflineProductUsage, std::string LicenseFileName) 
 		: LicenseServerEndpoint(LicenseServerEndpoint), bAllowOfflineProductUsage(bAllowOfflineProductUsage), LicenseFileName(LicenseFileName)
 	{
-		auto pubKeyEncrypted = make_encrypted("-----BEGIN PUBLIC KEY----- MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjvVM0FPoNZEXm6I0LLrXW26f3MuUKNaTcrtLEzm9G3Xh12krtLLzJovw9ThHiY7GMe72V0VVERMX7/LoqW5xai0hGoEcO975JlO5zVZ0XKuXiFjgiBAaYHXrAIqG69MMuZO4D4nLnayXV/tZUFYRX4P0zH1E4xigln1dluQ5F93ZnD+IneCOOlcJp1g/SZXMwlIE+H9ADVSdYlmzKKGd6+t26L2HeX854gVQuxAX8pbY9Sd2FR26QZi7yS4w9QdZd/6ATNjfT1UdpFRUwDAQJBru/MZIYm2bk3RWbcPG/IuPQqNpjggvTxmiFzNaDLoOrB3yt3UTOT4qaJTp2ohqPwIDAQAB-----END PUBLIC KEY-----");
-		RSAPubKeyPinned = new char[pubKeyEncrypted.getSize() + 1];
-		pubKeyEncrypted.decrypt(RSAPubKeyPinned); //store the encrypted public key in a string
 	}
 
 	~LicenseManager()
 	{
 		if (RSAPubKeyPinned != nullptr)
 			delete[] RSAPubKeyPinned;
+
+		if (PINNED_PUB_KEY_X != nullptr)
+			delete[] PINNED_PUB_KEY_X;
+
+		if (PINNED_PUB_KEY_Y != nullptr)
+			delete[] PINNED_PUB_KEY_Y;
 	}
 
-	bool VerifyLicense();
-	bool VerifyLicenseOnline(bool bUsingEncryption);
+	bool SendLicenseInfo(__in const bool bUsingEncryption);
+
+	static bool Sha256_CNG(const void* data, size_t len, std::vector<uint8_t>& out32);
+	static bool DerEcdsaToP1363(const uint8_t* der, size_t derLen, uint8_t out64[64]);
+
+	BCRYPT_KEY_HANDLE import_es256_pubkey(__in std::vector<uint8_t>& x, __in std::vector<uint8_t>& y);
+    bool VerifyLicenseJWT_ES256(__in const std::string& token);
+
+	const uint8_t* GetPubX() const  { return PINNED_PUB_KEY_X; }
+	const uint8_t* GetPubY() const { return PINNED_PUB_KEY_Y; }
+
+	bool IsOfflineUsageAllowed() const { return bAllowOfflineProductUsage; }
 
 private:
 	
@@ -45,36 +59,8 @@ private:
 	std::vector<uint8_t> LoadPublicKeyContents(const std::string& pubKeyText);
 	BCRYPT_KEY_HANDLE LoadRSAPublicKey(const std::vector<uint8_t> derData);
 	bool VerifySignature(BCRYPT_KEY_HANDLE hKey, const std::vector<uint8_t>& licenseData, const std::vector<uint8_t>& signature);
+
+	//pinned public key -> replace with your public key X/Y from dump_xy.py  (we originally generate an ECDSA keypair with openssl, then make a license.jwt file which embeds license details)
+	const uint8_t* PINNED_PUB_KEY_X = new uint8_t[32] { 0x0e,0x8a,0x31,0x1e,0x93,0x8d,0xc5,0x14,0x8e,0xb7,0x9c,0xb1,0x70,0xd9,0xca,0x35,0x3a,0x44,0x9b,0xb9,0xe1,0x65,0xa0,0xc3,0xfb,0xc6,0xb8,0x73,0x2b,0xd8,0xcd,0xc8 };
+	const uint8_t* PINNED_PUB_KEY_Y = new uint8_t[32] { 0xfe,0x24,0xf5,0x84,0xeb,0x0e,0x20,0x39,0xd3,0x66,0xbe,0x76,0x14,0x3c,0xdb,0xc0,0xc1,0x97,0xca,0x96,0x83,0x55,0x99,0x0f,0xc1,0x18,0x5b,0x1d,0x7d,0x94,0x48,0x67 };
 };
-
-/*
- Priv key to match above pub key:
------BEGIN RSA PRIVATE KEY-----
-MIIEoQIBAAKCAQEAjvVM0FPoNZEXm6I0LLrXW26f3MuUKNaTcrtLEzm9G3Xh12kr
-tLLzJovw9ThHiY7GMe72V0VVERMX7/LoqW5xai0hGoEcO975JlO5zVZ0XKuXiFjg
-iBAaYHXrAIqG69MMuZO4D4nLnayXV/tZUFYRX4P0zH1E4xigln1dluQ5F93ZnD+I
-neCOOlcJp1g/SZXMwlIE+H9ADVSdYlmzKKGd6+t26L2HeX854gVQuxAX8pbY9Sd2
-FR26QZi7yS4w9QdZd/6ATNjfT1UdpFRUwDAQJBru/MZIYm2bk3RWbcPG/IuPQqNp
-jggvTxmiFzNaDLoOrB3yt3UTOT4qaJTp2ohqPwIDAQABAoIBABgeeLw5O9c1yIbg
-ge7+AvGRI3WL/044jZ3wzYTL3ATzCYxfWRlei7l4KMommaMyrGumRneI4gZEc2hv
-UiOr14SzYn9nQw0y3FREEff72xv7c1B0tkUeemTF4EUyGftVmzMAIjC07d6HTO1y
-Iap1Ku8zgyyxAdtSv11Ef3LCxIMrD/KbPc+R4SU85rlrdhzTizOicU3W7uyVcm2H
-shhrBtS5YqU2M2HXHQmMXTDUZ9RdGcNcAaF9tMgZnLKM1gNBxa0L5vTCqc2Wlf0t
-Zy3m0u1BZ5SMAvuBy6TVHiFyhhcf05We0fIqJUrJ6mew0N2JJfD4QFLKvDKB10j7
-dfBcHAECgYEA6pSlcg8J+naTl83OQdbccQJWqToVFT2Iu4VgqE5v/+0CO2zGgfD8
-PVpVJE5dE41HEZBPqI8TrV6oKUgO7MRjTl68sff3dRqXDiBaohwSf1gdE+EscwiM
-NlN9MmCRzI/Ix3RXzl9IJHkO2Qj1pG5FHQizZ5ijdSuBNc+mKt6uUgECgYEAnAL3
-i87RAQUTh+4YKKT/I+DSGgGw7XHnRY85F3HdW8jeFltG3JkloysRX/VJZvZdgWpn
-rJyswvbXjIEKUsA9OTkgAL4wJPNH1EvYEl7jgKJmz6X4obVctB3j2v3UbbvUVkcM
-/O8T9eJmoLuOtUN3VzramJI19jDKXZ9UIj5qPD8CgYEAnOpoLX7v3tH48r/hq9sN
-RK8ax0KqHbY2w7F5sbweYWTqbFPcCcnpASVu9MVSr6R+mLoe/xMOR5edB1hDW5AX
-GbJ3qNjFeFkcGH/+AJikqviHIugqMpzSJfj9M3izrtGzrfAeWFcWTAeKrhW3M5Hr
-u3s5fx/0n4lFenh3oA+rLgECgYAAhq4JBaiExVycf7wLHwtRNqfeuJS9KD4saOA7
-aQHjFllRX/tsMQQEede0KCKYO0pzbkVtOpYGjkiJy8GaJ9XNBJlMB1goN73NRHg1
-D6bavzFzj8631OG8JcGn8mUt/Y0owVKU48WAdcP81MUVbWXQoH0uOIgADYgRKsFg
-4C8BhwJ/L3uKfSA/jjmXC4dskE9VtE0nswINsOveUCO/+ZVUwGL3jd7gYQiMzoVu
-/Etn9qb+Q/lXdilFT3lbVvaBYWZImZsBo/iGhJOE/lfX0YRzI7yUg2/UtfCZRjUh
-AIxHPwy21ayTXuGbssBXbT8LBVOhe+JT6yq39XFEPkNentIwnw==
------END RSA PRIVATE KEY-----
-
-*/

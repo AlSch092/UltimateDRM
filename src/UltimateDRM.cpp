@@ -6,7 +6,7 @@
 #include "../include/remap.hpp"
 #endif
 #include "../include/UltimateDRM.hpp" //keep majority of includes in this .cpp instead of .hpp to hide implementation details from lib user and reduce number of header files needing to distribute
-#include "../include/Settings.hpp"
+#include "../include/DRMSettings.hpp"
 #include "../include/MapProtectedClass.hpp"
 #include "../include/Logger.hpp"
 #include "../include/LicenseManager.hpp"
@@ -52,14 +52,14 @@ struct UltimateDRM::Impl
 
 	std::unique_ptr<DebuggerDetections> AntiDebugger = nullptr; //debugger detections for the current process
 
-	Settings* Config = nullptr;
+	DRMSettings* Config = nullptr;
 
-	Impl(Settings* s)
+	Impl(DRMSettings* s)
 	{
-		this->ProtectedSettings = new ProtectedMemory(sizeof(Settings));
+		this->ProtectedSettings = new ProtectedMemory(sizeof(DRMSettings));
 
 		//since we're mapping our settings instance into protected memory, re-make an object with the same options that the user provided
-		this->Config = this->ProtectedSettings->Construct<Settings>( 
+		this->Config = this->ProtectedSettings->Construct<DRMSettings>( 
 			s->LicenseServerEndpoint,
 			s->bShutdownOnViolation,
 			s->bAllowOfflineUsage,
@@ -122,7 +122,7 @@ struct UltimateDRM::Impl
 	bool StopMultipleProcessInstances();
 };
 
-UltimateDRM::UltimateDRM(Settings* s)
+UltimateDRM::UltimateDRM(DRMSettings* s)
 	: pImpl(new UltimateDRM::Impl(s))
 {
 }
@@ -142,25 +142,26 @@ std::vector<DRMViolation> UltimateDRM::GetViolations() const noexcept
 	if (this->pImpl == nullptr || this->pImpl->IntegrityChecker == nullptr)
 		return {};
 
-	auto IntegrityViolations = this->pImpl->IntegrityChecker.get()->GetViolations();
-
-	auto DebuggerViolations = this->pImpl->AntiDebugger.get()->GetDetectedMethods();
-
+	if (this->pImpl->IntegrityChecker != nullptr && this->pImpl->IntegrityChecker.get() != nullptr)
 	{
-		std::lock_guard<std::mutex> lock(this->pImpl->IntegrityChecker->ViolationsMutex);
-		//fetch violation list from integrityChecker, antidebugger, etc, copy to a returned list
+		auto IntegrityViolations = this->pImpl->IntegrityChecker.get()->GetViolations();
+
 		for (const auto& integrityViolation : IntegrityViolations)
 		{
-			violationList.emplace_back(DRMViolation{ DRMViolation::Type::Integrity, integrityViolation.address,  integrityViolation.description, integrityViolation.timestamp });
+			violationList.emplace_back(DRMViolation{ DRMViolation::Type::Integrity, integrityViolation.address,  integrityViolation.description });
 		}
+	}
+
+	if (this->pImpl->AntiDebugger != nullptr && this->pImpl->AntiDebugger.get() != nullptr)
+	{
+		auto DebuggerViolations = this->pImpl->AntiDebugger.get()->GetDetectedMethods();
 
 		for (const auto& debugViolation : DebuggerViolations)
 		{
-			violationList.emplace_back(DRMViolation{ DRMViolation::Type::Debugging, 0, 0, 0 });
+			violationList.emplace_back(DRMViolation{ DRMViolation::Type::Debugging, (uintptr_t)debugViolation.type, L"" });
 		}
-
 	}
-
+	    
 	return violationList;
 }
 
@@ -198,17 +199,17 @@ bool UltimateDRM::Protect()
 
 		if (!this->pImpl->Config->bAllowOfflineUsage)
 		{
-			if (!this->pImpl->LicenseManagerPtr->VerifyLicenseOnline(false)) //licensing is not finished yet!
-			{
-				throw DRMException(DRMException::LicenseVerificationFailed);
-			}
+			//if (!this->pImpl->LicenseManagerPtr->VerifyLicenseOnline(false)) //licensing is not finished yet!
+			//{
+			//	throw DRMException(DRMException::LicenseVerificationFailed);
+			//}
 		}
 		else
 		{
-			if (!this->pImpl->LicenseManagerPtr->VerifyLicense())
-			{
-				throw DRMException(DRMException::LicenseVerificationFailed);
-			}
+			//if (!this->pImpl->LicenseManagerPtr->VerifyLicense())
+			//{
+			//	throw DRMException(DRMException::LicenseVerificationFailed);
+			//}
 		}
 	}
 
@@ -434,14 +435,14 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 	case DLL_PROCESS_ATTACH:
 	{
 
-#ifndef _DEBUG
-		if (!Debugger::AntiDebug::HideThreadFromDebugger(GetCurrentThread())) //hide thread from debuggers, placing this in the TLS callback allows all threads to be hidden
-		{
-#ifdef _LOGGING_ENABLED
-			Logger::logf(Warning, " Failed to hide thread from debugger @ TLSCallback: thread id %d\n", GetCurrentThreadId());
-#endif
-		}
-#endif
+//#ifndef _DEBUG
+//		if (!Debugger::AntiDebug::HideThreadFromDebugger(GetCurrentThread())) //hide thread from debuggers, placing this in the TLS callback allows all threads to be hidden
+//		{
+//#ifdef _LOGGING_ENABLED
+//			Logger::logf(Warning, " Failed to hide thread from debugger @ TLSCallback: thread id %d\n", GetCurrentThreadId());
+//#endif
+//		}
+//#endif
 		WinVersion = Services::GetWindowsVersion();
 
 		if (WinVersion == Windows10) //Windows 11 no longer has the thread's start address on its stack when the tls callback is hit
@@ -469,14 +470,14 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 
 	case DLL_THREAD_ATTACH: //add to our thread list, or if thread is not executing valid address range, patch over execution address
 	{
-#ifndef _DEBUG
-		if (!Debugger::AntiDebug::HideThreadFromDebugger(GetCurrentThread())) //hide thread from debuggers, placing this in the TLS callback allows all threads to be hidden
-		{
-#ifdef _LOGGING_ENABLED
-			Logger::logf(Warning, " Failed to hide thread from debugger @ TLSCallback: thread id %d\n", GetCurrentThreadId());
-#endif
-		}
-#endif
+//#ifndef _DEBUG
+//		if (!Debugger::AntiDebug::HideThreadFromDebugger(GetCurrentThread())) //hide thread from debuggers, placing this in the TLS callback allows all threads to be hidden
+//		{
+//#ifdef _LOGGING_ENABLED
+//			Logger::logf(Warning, " Failed to hide thread from debugger @ TLSCallback: thread id %d\n", GetCurrentThreadId());
+//#endif
+//		}
+//#endif
 
 		if (WinVersion == WindowsVersion::Windows11) //thread start address is not on the stack in windows 11
 			return;
@@ -534,3 +535,51 @@ LONG WINAPI g_VectoredExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo)
 	return EXCEPTION_CONTINUE_SEARCH;
 }
 
+/**
+ * @brief Checks license token string (base64'd JWT) for validity
+ *
+ * @param `LicenseTokenString`  b64 format license string found in `license.jwt` (or similar)
+ *
+ * @return true/false indicating whether the license key is valid
+ *
+ * @details Certain unhandled exceptions might be indicative of tampering. This routine should be heavily obfuscated in release builds
+ *
+ *  @example
+ *
+ * @usage
+ *  bool licensed = DRM->CheckLicenseVerified("eyJhbGciOiJFUzI1NiIsImtpZCI6InYxIiwidHlwIjoiSldUIn0.eyJleHAiOjE3ODcyNzI2NDIsImZlYXR1cmV...");
+ */
+bool UltimateDRM::CheckLicenseVerified(__in const std::string& LicenseTokenString, __in const bool bAllowOfflineLicense)
+{
+	if (this->pImpl != nullptr && !this->pImpl->Config->bUsingLicensing)
+	{
+		return false;
+	}
+
+	if (this->pImpl != nullptr && this->pImpl->LicenseManagerPtr != nullptr)
+	{
+		bool bSuccess = this->pImpl->LicenseManagerPtr->VerifyLicenseJWT_ES256(LicenseTokenString);
+
+		if (bAllowOfflineLicense && bSuccess)
+			return true;
+		else if (!bAllowOfflineLicense && bSuccess)
+		{
+			//todo: get back license info from VerifyLicenseJWT_ES256 (need change return type) then send to server to verify online
+
+			//if(VerifyLicenseOnline(...))
+			//    return true;
+			//else
+			//    return false;
+		}
+		else
+			return false;
+	}
+	else
+	{
+#ifdef _LOGGING_ENABLED
+		Logger::logf(Err, "NULLPTR issue @ UltimateDRM::CheckLicenseVerified");
+#endif
+	}
+
+	return false;
+}

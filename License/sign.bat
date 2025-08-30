@@ -1,0 +1,1 @@
+ python sign_license.py --priv vendor_priv.pem --org "Your Program" --plan floating --seats 250 --days 365 > license.jwt

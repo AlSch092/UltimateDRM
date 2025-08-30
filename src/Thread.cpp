@@ -48,6 +48,9 @@ bool Thread::BeginExecution(LPTHREAD_START_ROUTINE toExecute, LPVOID lpOptionalP
     }
     else
     {
+#ifdef ENABLE_LOGGING
+        Logger::logf(Warning, "`toExecute` parameter was NULL @ BeginExecution");
+#endif
         return false;
     }
 }
