@@ -47,9 +47,9 @@ int main(int argc, char** argv)
 
 	std::list<std::wstring> lAllowedParents = { L"steam.exe", L"explorer.exe", L"VsDebugConsole.exe", L"powershell.exe", L"pwsh.exe", L"cmd.exe" };
 
-	const std::string LicenseServerEndpoint = "http://localhost:5002/Verify"; //replace with your actual license server endpoint
+	const std::string LicenseServerEndpoint = "http://localhost:5005/"; //replace with your actual license server endpoint
 	const std::string LicenseFilePath = "license.jwt"; //path to license file
-	const bool bAllowOfflineUsage = true;
+	const bool bAllowOfflineUsage = false;
 	const bool bUsingLicensing = true;
 	const bool bEnforceHypervisorCheck = false; //having this set to true will cause Github Actions tests to fail, since they run on a VM
 	const bool bRequireCodeSigning = false; //in production code, this should be set to true
@@ -102,7 +102,11 @@ int main(int argc, char** argv)
 	if(licenseFile.is_open())
 	    licenseFile.close();
 
-	if (drm->CheckLicenseVerified(licenseJWTString, bAllowOfflineUsage))
+        //this will fail github actions runners since it requires a server to be present
+	uint8_t pubX[32] = {0x67,0x9c,0x29,0xc3,0x19,0x61,0x5e,0x7e,0xa4,0x99,0x10,0x1d,0x69,0x3d,0x7c,0xe7,0xc5,0x27,0x6d,0xc8,0x0a,0xa0,0x07,0xe4,0x92,0xea,0x94,0xa5,0x7b,0x14,0x2a,0x32};
+	uint8_t pubY[32] = {0xf9,0x01,0xb2,0x23,0x2a,0x95,0xe9,0x2f,0xbf,0x79,0xba,0x7d,0xe4,0xd2,0x3e,0xcf,0xaa,0x4e,0xb7,0xfe,0x94,0x4f,0xd7,0x73,0x35,0xc5,0x53,0xcf,0x58,0xa9,0xb2,0x18};
+
+	if (drm->CheckLicenseVerified(licenseJWTString, bAllowOfflineUsage, pubX, pubY))
 	{
 		printf("License OK\n");
 	}
@@ -168,6 +172,8 @@ int main(int argc, char** argv)
 
 		Sleep(1000);
 	}
+
+	drm->PushHeartbeat(licenseJWTString); //test heartbeat functionality
 
 	delete drm;
 
