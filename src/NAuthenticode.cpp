@@ -495,7 +495,7 @@ BOOL Authenticode::GetTimeStampSignerInfo(__in PCMSG_SIGNER_INFO pSignerInfo, __
 * @usage
 * wstring subjectName = Authenticode::GetCertificateSubject(pCertContext);
 */
-wstring Authenticode::GetCertificateSubject(__in PCCERT_CONTEXT pCertContext)
+std::wstring Authenticode::GetCertificateSubject(__in PCCERT_CONTEXT pCertContext)
 {
     BOOL fReturn = FALSE;
     LPTSTR szName = NULL;
@@ -557,7 +557,7 @@ wstring Authenticode::GetCertificateSubject(__in PCCERT_CONTEXT pCertContext)
         goto end;
     }
 
-    return wstring(szName);
+    return std::wstring(szName);
 
 end:
     if (szName != NULL) LocalFree(szName);
@@ -575,7 +575,7 @@ end:
  * @usage
  * wstring signer = Authenticode::GetSignerFromFile(L"myfile.exe");
  */ 
-wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
+std::wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
 {
     WCHAR szFileName[MAX_PATH];
     HCERTSTORE hStore = NULL;
@@ -687,7 +687,7 @@ wstring Authenticode::GetSignerFromFile(const std::wstring& filePath)
         return {};
     }
 
-    wstring SubjectCert = GetCertificateSubject(pCertContext);
+    std::wstring SubjectCert = GetCertificateSubject(pCertContext);
 
     //// Get the timestamp certificate signerinfo structure.
     //if (GetTimeStampSignerInfo(pSignerInfo, &pCounterSignerInfo))

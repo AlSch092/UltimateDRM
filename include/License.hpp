@@ -140,15 +140,15 @@ public:
 			return LicenseStatus::WrongProduct;
 
 		// - plan in allowed set
-		static const std::unordered_set<std::string> kPlans = { "edu-floating","named-device","site" };
+		static const std::unordered_set<std::string> kPlans = { "trial", "monthly","ongoing", "infinite" };
 
 		if (!kPlans.count(c.plan)) 
 			return LicenseStatus::InvalidPlan;
 
 		// - seats rule: null for "site", present & >=1 otherwise
-		if (c.plan == "site") 
+		if (c.plan == "trial") 
 		{
-			if (c.seats != 0) 
+			if (c.seats != 1) 
 				return LicenseStatus::InvalidSeats;
 		}
 		else 
@@ -250,7 +250,8 @@ public:
 			licenseResult.status = License::LicenseStatus::Expired;
 			return licenseResult;
 		}
-
+		//iat = 1756694840
+		//now = 1756683456
 		if (licenseResult.claims.iat > now + kSkew)
 		{
 			licenseResult.status = License::LicenseStatus::ClockSkew;
@@ -274,7 +275,57 @@ public:
 		// TODO: look up in your store
 		return false;
 	}
-
-
 };
 
+using json = nlohmann::json;
+
+struct LicenseActivateRequest
+{
+	std::string license_token;
+	std::string machine_id;
+	std::string software_version;
+};
+
+struct LicenseActivateResponse
+{
+	bool ok;
+	std::string lease_id;
+	uint64_t lease_expires_in;
+};
+
+static void to_json(json& j, const LicenseActivateRequest& request)
+{
+	j = json{
+			{"license_token", request.license_token},
+			{"machine_id", request.machine_id},
+			{"software_version", request.software_version},
+	};
+}
+
+static inline void from_json(const nlohmann::json& j, LicenseActivateRequest& request)
+{
+	if (j.contains("license_token") && !j["license_token"].is_null())
+		j["license_token"].get_to(request.license_token);
+
+	if (j.contains("machine_id") && !j["machine_id"].is_null())
+		j["machine_id"].get_to(request.machine_id);
+
+	if (j.contains("software_version") && !j["software_version"].is_null())
+		j["software_version"].get_to(request.software_version);
+}
+
+static void to_json(json& j, const LicenseActivateResponse& response)
+{
+	j = json{
+			{"ok", response.ok},
+			{"lease_id", response.lease_id},
+			{"lease_expires_in", response.lease_expires_in},
+	};
+}
+
+static void from_json(const nlohmann::json& j, LicenseActivateResponse& response)
+{
+	j.at("ok").get_to(response.ok);
+	j.at("lease_id").get_to(response.lease_id);
+	j.at("lease_expires_in").get_to(response.lease_expires_in);
+}

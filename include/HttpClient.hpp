@@ -7,16 +7,14 @@
 #include <vector>
 #include "Logger.hpp"
 
-using namespace std;
-
 struct HttpRequest
 {
-    string url;
-	vector<string> requestHeaders;
-    string cookie;
-	string body;
-    vector<string> responseHeaders;
-    string responseText;
+    std::string url;
+    std::vector<std::string> requestHeaders;
+    std::string cookie;
+    std::string body;
+    std::vector<std::string> responseHeaders;
+    std::string responseText;
 };
 
 struct MemoryStruct
@@ -26,7 +24,7 @@ struct MemoryStruct
 
 struct ResponseHeaders
 {
-    vector<std::string> headers;
+    std::vector<std::string> headers;
 };
 
 class HttpClient //a simple class for making web/http requests.

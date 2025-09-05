@@ -10,14 +10,14 @@
  * @usage
  * string randomStr = Utility::GenerateRandomString(16);
  */
-string Utility::GenerateRandomString(__in const int length)
+std::string Utility::GenerateRandomString(__in const int length)
 {
     if (length <= 0) return "";
 
     const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
     const size_t charsetSize = strlen(charset);
 
-    string randomString;
+    std::string randomString;
     randomString.reserve(length);
 
     static bool seedInitialized = false;
@@ -44,14 +44,14 @@ string Utility::GenerateRandomString(__in const int length)
  * @usage
  * wstring randomStr = Utility::GenerateRandomWString(16);
  */
-wstring Utility::GenerateRandomWString(__in const int length)
+std::wstring Utility::GenerateRandomWString(__in const int length)
 {
     if (length <= 0) return L"";
 
     const wchar_t charset[] = L"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
     const size_t charsetSize = wcslen(charset);
 
-    wstring randomString;
+    std::wstring randomString;
     randomString.reserve(length);
 
     static bool seedInitialized = false;
@@ -329,6 +329,16 @@ bool Utility::ContainsWStringInsensitive(__in const std::wstring& haystack, __in
     return lowerHaystack.find(lowerNeedle) != std::wstring::npos;
 }
 
+
+/*
+ * @brief Modifies an NT path to being it's corresponding DOS path (ex. \\??\... to C:\)
+ *
+ * @param ntPath   input path in NT format
+ * @return wstring value of a DOS path from the input NT path
+ *
+ * @usage
+ * std::wstring dosPath = Utility::NtPathToDosPath(L"\\\\??\\C:\\WINDOWS\\System32\\test.txt");
+ */
 std::wstring Utility::NtPathToDosPath(const std::wstring& ntPath)
 {
     if (ntPath.empty()) return L"";

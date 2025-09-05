@@ -538,8 +538,10 @@ LONG WINAPI g_VectoredExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo)
 /**
  * @brief Checks license token string (base64'd JWT) for validity
  *
- * @param `LicenseTokenString`  b64 format license string found in `license.jwt` (or similar)
- *
+ * @param LicenseTokenString  b64 format license string found in `license.jwt` (or similar)
+ * @param bAllowOfflineLicense  Whether or not to enforce/check the license against the verification server
+ * @param pubX  Extracted 'X' from the license public key (dump_xy.py)
+ * @param puby  Extracted 'y' from the license public key (dump_xy.py)
  * @return true/false indicating whether the license key is valid
  *
  * @details Certain unhandled exceptions might be indicative of tampering. This routine should be heavily obfuscated in release builds
@@ -549,27 +551,38 @@ LONG WINAPI g_VectoredExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo)
  * @usage
  *  bool licensed = DRM->CheckLicenseVerified("eyJhbGciOiJFUzI1NiIsImtpZCI6InYxIiwidHlwIjoiSldUIn0.eyJleHAiOjE3ODcyNzI2NDIsImZlYXR1cmV...");
  */
-bool UltimateDRM::CheckLicenseVerified(__in const std::string& LicenseTokenString, __in const bool bAllowOfflineLicense)
+bool UltimateDRM::CheckLicenseVerified(__in const std::string& LicenseTokenString, __in const bool bAllowOfflineLicense, __in const uint8_t* pubX, __in const uint8_t* pubY)
 {
 	if (this->pImpl != nullptr && !this->pImpl->Config->bUsingLicensing)
 	{
 		return false;
 	}
 
+	if (this->pImpl != nullptr && pubX != nullptr && pubY != nullptr)
+	{
+		this->pImpl->LicenseManagerPtr->SetPubXY(pubX, pubY);
+	}
+
 	if (this->pImpl != nullptr && this->pImpl->LicenseManagerPtr != nullptr)
 	{
 		bool bSuccess = this->pImpl->LicenseManagerPtr->VerifyLicenseJWT_ES256(LicenseTokenString);
+
+		this->pImpl->LicenseManagerPtr->SetLicenseToken(LicenseTokenString);
 
 		if (bAllowOfflineLicense && bSuccess)
 			return true;
 		else if (!bAllowOfflineLicense && bSuccess)
 		{
-			//todo: get back license info from VerifyLicenseJWT_ES256 (need change return type) then send to server to verify online
+			std::string lease;
+			if (!this->pImpl->LicenseManagerPtr->SendLicenseInfo(false, "AdminPC-123456", "1", lease))
+			{
+#ifdef _LOGGING_ENABLED
+				Logger::logf(Err, "Online license check failed!");
+#endif
+				return false;
+			}
 
-			//if(VerifyLicenseOnline(...))
-			//    return true;
-			//else
-			//    return false;
+			return true;
 		}
 		else
 			return false;
@@ -582,4 +595,27 @@ bool UltimateDRM::CheckLicenseVerified(__in const std::string& LicenseTokenStrin
 	}
 
 	return false;
+}
+
+bool UltimateDRM::PushHeartbeat(__in const std::string& LicenseTokenString)
+{
+	if ((this->pImpl != nullptr && !this->pImpl->Config->bUsingLicensing) || this->pImpl == nullptr)
+	{
+		return false;
+	}
+
+	HttpRequest request;
+	request.url = this->pImpl->Config->LicenseServerEndpoint + "v1/heartbeat";
+	request.body = "lease_id=" + LicenseTokenString;
+	request.cookie = "";
+
+	if (!HttpClient::PostRequest(request))
+	{
+#ifdef _LOGGING_ENABLED
+		OutputDebugStringA("Failed to send heartbeat!\n");
+#endif
+		return false;
+	}
+
+	return true;
 }

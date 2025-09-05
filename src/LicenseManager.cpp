@@ -1,5 +1,8 @@
 #include "../include/LicenseManager.hpp"
 
+
+
+
 /**
  * @brief Checks license key online via HTTP(S)
  *
@@ -17,9 +20,11 @@
  * @usage
  * bool verified = LicenseManager->SendLicenseInfo(true); 
  */
-bool LicenseManager::SendLicenseInfo(__in const bool bUsingEncryption)
+bool LicenseManager::SendLicenseInfo(__in const bool bUsingEncryption, __in const std::string& machine_id, __in const std::string& software_version, __out std::string& leaseId)
 {
-	if (this->LicenseServerEndpoint.empty() || this->LicenseKey.empty())
+	leaseId = "";
+
+	if (this->LicenseServerEndpoint.empty() || machine_id.empty() || software_version.empty())
 	{
 		//throw std::runtime_error("License information cannot be empty @ VerifyLicenseOnline");
 		return false;
@@ -31,25 +36,59 @@ bool LicenseManager::SendLicenseInfo(__in const bool bUsingEncryption)
 		"Accept: application/json"
 	};
 
-	std::string postBody = "({\"action\": \"verify_license\", \"license_key\": " + this->LicenseKey + "})"; //can be encrypted further to reduce HTTP interception/sniffing
-	
+	LicenseActivateRequest request;
+	request.license_token = this->LicenseToken;
+	request.machine_id = machine_id;
+	request.software_version = software_version;
+
+	json j;
+	to_json(j, request);
+		
+	std::string requestBody = j.dump();
+
 	if (bUsingEncryption) //encrypt HTTP post body
 	{
 		//todo: twofish encryption, will add soon
+		//TwoFishEncManager enc; 
+		// requestBody = enc.Encrypt(requestBody.c_str());
 	}
 
 	HttpRequest requestInfo;
-	requestInfo.url = this->LicenseServerEndpoint;
+	requestInfo.url = this->LicenseServerEndpoint + "v1/activate";
 	requestInfo.requestHeaders = headers;
-	requestInfo.body = postBody;
+	requestInfo.body = requestBody;
 
 	if (!HttpClient::PostRequest(requestInfo))
 	{
+#ifdef _LOGGING_ENABLED
+		std::cerr << "POST Request failed @ LicenseManager::SendLicenseInfo\n";
+		OutputDebugStringA("POST Request failed @ LicenseManager::SendLicenseInfo\n");
+#endif
 		return false; //failed to send request
 	}
 
-	if (requestInfo.responseText.empty() || std::find(requestInfo.responseHeaders.begin(), requestInfo.responseHeaders.end(), "HTTP/1.1 200 OK") == requestInfo.responseHeaders.end())
+	if (requestInfo.responseText.empty() || std::find(requestInfo.responseHeaders.begin(), requestInfo.responseHeaders.end(), "HTTP/1.1 200 OK\r\n") == requestInfo.responseHeaders.end())
 	{
+#ifdef _LOGGING_ENABLED
+		std::cerr << "POST Request had bad response @ LicenseManager::SendLicenseInfo\n";
+		OutputDebugStringA("POST Request had bad response @ LicenseManager::SendLicenseInfo\n");
+#endif
+		return false;
+	}
+
+	LicenseActivateResponse response;
+	try
+	{
+		nlohmann::json jstxt = nlohmann::json::parse(requestInfo.responseText);
+		jstxt.get_to(response);
+	}
+	catch (...)
+	{
+#ifdef _LOGGING_ENABLED
+		std::cerr << "Parsing license response JSON failed @ SendLicenseInfo" << std::endl;
+		OutputDebugStringW(L"Parsing license response JSON failed @ SendLicenseInfo \n");
+#endif
+
 		return false;
 	}
 
@@ -58,7 +97,9 @@ bool LicenseManager::SendLicenseInfo(__in const bool bUsingEncryption)
 		//todo: add twofish encryption
 	}
 
-	return (requestInfo.responseText.find("\"status\": \"valid\"") != std::string::npos) ? true : false;
+	leaseId = response.lease_id;//requestInfo.responseText.substr(leaseId_pos + std::string("lease_id\":\"").size(), leaseId_end - leaseId_pos - std::string("lease_id\":\"").size());
+
+	return (response.ok && !leaseId.empty());
 }
 
 /**
@@ -104,9 +145,6 @@ BCRYPT_KEY_HANDLE LicenseManager::import_es256_pubkey(__in std::vector<uint8_t>&
 		blob.xy[32 + i] = _y[i];
 	}
 
-	//delete[] x;
-	//delete[] y;
-
 	BCRYPT_KEY_HANDLE hKey = nullptr;
 	st = BCryptImportKeyPair(hAlg, nullptr, BCRYPT_ECCPUBLIC_BLOB, &hKey, (PUCHAR)&blob, sizeof(blob), 0);
 	BCryptCloseAlgorithmProvider(hAlg, 0);
@@ -131,7 +169,7 @@ BCRYPT_KEY_HANDLE LicenseManager::import_es256_pubkey(__in std::vector<uint8_t>&
  *
  * @details The licenseData should be the same as what was signed with the private key.
  */
-bool LicenseManager::Sha256_CNG(const void* data, size_t len, std::vector<uint8_t>& out32)
+bool LicenseManager::Sha256_CNG(const void* data, const size_t len, std::vector<uint8_t>& out32)
 {
 	if (data == nullptr || len == 0)
 	{
@@ -317,7 +355,7 @@ bool LicenseManager::VerifyLicenseJWT_ES256(__in const std::string& token)
 
 
 // --- DER (ASN.1 SEQUENCE of two INTEGERs) -> P-1363 (r||s, 32+32) ---
-bool LicenseManager::DerEcdsaToP1363(const uint8_t* der, size_t derLen, uint8_t out64[64]) 
+bool LicenseManager::DerEcdsaToP1363(__in const uint8_t* der, __in const size_t derLen, __out uint8_t out64[64])
 {
 	// Minimal parser (assumes well-formed ECDSA DER from cryptography)
 	size_t i = 0;

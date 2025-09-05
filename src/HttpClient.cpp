@@ -33,21 +33,19 @@ bool HttpClient::GetRequest(__inout HttpRequest& requestInfo) //GET request
     curl = curl_easy_init();
 
     struct curl_slist* request_headers = NULL;
-    vector<std::string> response_headers;
+    std::vector<std::string> response_headers;
 
     if (curl)
     {
         curl_easy_setopt(curl, CURLOPT_URL, requestInfo.url.c_str());
-
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &requestInfo.responseText);
-
         curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, HeaderCallback);
         curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response_headers);
-
+        
         if(!requestInfo.cookie.empty())
             curl_easy_setopt(curl, CURLOPT_COOKIE, requestInfo.cookie.c_str()); 
-
+        
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, OPERATION_TIMEOUT);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, CONNECT_TIMEOUT);
 
@@ -141,20 +139,13 @@ bool HttpClient::PostRequest(__inout HttpRequest& requestInfo)
             curl_easy_setopt(curl, CURLOPT_COOKIE, requestInfo.cookie.c_str()); //set cookie
 
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, requestInfo.body.c_str()); //set body
-
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L); // Timeout for the whole operation in seconds
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L); // Timeout for the connection phase in seconds
-
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);         // Set the callback function to handle the response data
-
         curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, HeaderCallback);
         curl_easy_setopt(curl, CURLOPT_HEADERDATA, &requestInfo.responseHeaders);
-
         curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_callback);
-
-        // Set the data pointer
         curl_easy_setopt(curl, CURLOPT_READDATA, (void*)0);
-
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &requestInfo.responseText); //response data , write to
 
         res = curl_easy_perform(curl);

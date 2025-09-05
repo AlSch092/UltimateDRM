@@ -67,21 +67,21 @@ BOOL Services::GetServiceModules()
 
     for (DWORD i = 0; i < servicesReturned; i++)  //iterate services and add to our managed list
     {
-        Service* service = new Service();
-        service->pid = services[i].ServiceStatusProcess.dwProcessId;
-        service->displayName = services[i].lpDisplayName;
-        service->serviceName = services[i].lpServiceName;
+        Service service;
+        service.pid = services[i].ServiceStatusProcess.dwProcessId;
+        service.displayName = services[i].lpDisplayName;
+        service.serviceName = services[i].lpServiceName;
 
         switch (services[i].ServiceStatusProcess.dwCurrentState) 
         {
             case SERVICE_STOPPED:
-                service->isRunning = false;
+                service.isRunning = false;
                 break;
             case SERVICE_RUNNING:                
-                service->isRunning = true;
+                service.isRunning = true;
                 break;
             case SERVICE_PAUSED:
-                service->isRunning = false;
+                service.isRunning = false;
                 break;
             default:
                 break;
@@ -149,9 +149,9 @@ BOOL Services::GetLoadedDrivers()
  * @usage
  * list<wstring> unsignedDrivers = Services::GetUnsignedDrivers();
 */
-list<wstring> Services::GetUnsignedDrivers()
+std::list<std::wstring> Services::GetUnsignedDrivers()
 {
-    list<wstring> unsignedDrivers;
+    std::list<std::wstring> unsignedDrivers;
 
     if (DriverPaths.size() == 0)
     {
@@ -164,14 +164,14 @@ list<wstring> Services::GetUnsignedDrivers()
         }
     }
 
-    const wstring windowsDrive = Services::GetWindowsDriveW();
+    const std::wstring windowsDrive = Services::GetWindowsDriveW();
 
     for (const std::wstring& driverPath : DriverPaths)
     {
-        wstring fixedDriverPath;
+        std::wstring fixedDriverPath;
         bool foundWhitelisted = false;
 
-        if (driverPath.find(L"\\SystemRoot\\", 0) != wstring::npos) /* replace "\\SystemRoot\\" with "\\??\\<windowsVolume>\\WINDOWS" */
+        if (driverPath.find(L"\\SystemRoot\\", 0) != std::wstring::npos) /* replace "\\SystemRoot\\" with "\\??\\<windowsVolume>\\WINDOWS" */
         {
             fixedDriverPath = L"\\??\\" + windowsDrive + L"WINDOWS\\" + driverPath.substr(12);
         }
@@ -322,7 +322,7 @@ BOOL Services::IsSecureBootEnabled()
 /*
     GetWindowsDrive - return drive where windows is installed, such as C:\\
 */
-string Services::GetWindowsDrive()
+std::string Services::GetWindowsDrive()
 {
     CHAR volumePath[MAX_PATH];
     DWORD charCount;
@@ -351,7 +351,7 @@ string Services::GetWindowsDrive()
 /*
     GetWindowsDriveW - return drive where windows is installed, such as C:\\
 */
-wstring Services::GetWindowsDriveW()
+std::wstring Services::GetWindowsDriveW()
 {
     wchar_t volumePath[MAX_PATH];
     DWORD charCount;
@@ -398,9 +398,9 @@ BOOL Services::IsRunningAsAdmin()
 /*
     GetHardwareDevicesW - returns a list<DeviceW>  representing various devices on the machine
 */
-list<DeviceW> Services::GetHardwareDevicesW()
+std::list<DeviceW> Services::GetHardwareDevicesW()
 {
-    list<DeviceW> deviceList;
+    std::list<DeviceW> deviceList;
 
     HDEVINFO deviceInfoSet;
     SP_DEVINFO_DATA deviceInfoData;
@@ -426,7 +426,7 @@ list<DeviceW> Services::GetHardwareDevicesW()
         TCHAR deviceInstanceId[MAX_DEVICE_ID_LEN];
         if (CM_Get_Device_ID(deviceInfoData.DevInst, deviceInstanceId, MAX_DEVICE_ID_LEN, 0) == CR_SUCCESS)         // Get the device instance ID
         {
-            d.InstanceID = wstring(deviceInstanceId);
+            d.InstanceID = std::wstring(deviceInstanceId);
         }
         else
         {
@@ -436,7 +436,7 @@ list<DeviceW> Services::GetHardwareDevicesW()
         TCHAR deviceDescription[1024];
         if (SetupDiGetDeviceRegistryProperty(deviceInfoSet, &deviceInfoData, SPDRP_DEVICEDESC, NULL, (PBYTE)deviceDescription, sizeof(deviceDescription), NULL))          // Get the device description
         {
-            d.Description = wstring(deviceDescription);
+            d.Description = std::wstring(deviceDescription);
         }
         else 
         {
@@ -581,7 +581,7 @@ bool Services::IsHypervisorPresent()
     Services::GetCPUVendor - fetches the CPU vendor
 Additionally, 0x40000001 to 0x400000FF can be queries in the 2nd parameter to __cpuid for more hypervisor-specific info
 */
-const string Services::GetCPUVendor() 
+const std::string Services::GetCPUVendor()
 {
     int cpuInfo[4] = { 0 };
 
@@ -593,7 +593,7 @@ const string Services::GetCPUVendor()
     memcpy(vendor + 4, &cpuInfo[3], 4);
     memcpy(vendor + 8, &cpuInfo[2], 4);
 
-    return string(vendor);
+    return std::string(vendor);
 }
 
 /*
@@ -606,7 +606,7 @@ const string Services::GetCPUVendor()
 "prl hyperv"	Parallels
 "VBoxVBoxVBox"	VirtualBox
 */
-const string Services::GetHypervisorVendor()
+const std::string Services::GetHypervisorVendor()
 {
     int cpuInfo[4] = { 0 };
 
@@ -618,7 +618,7 @@ const string Services::GetHypervisorVendor()
     memcpy(vendor + 4, &cpuInfo[2], 4);
     memcpy(vendor + 8, &cpuInfo[3], 4);
 
-    return string(vendor);
+    return std::string(vendor);
 }
 
 /*
@@ -753,9 +753,9 @@ bool Services::UnloadDriver(__in const std::wstring& serviceName)
 /*
     EnumerateProcesses - return list of running processes ids
 */
-list<DWORD> Services::EnumerateProcesses()
+std::list<DWORD> Services::EnumerateProcesses()
 {
-    list<DWORD> procs;
+    std::list<DWORD> procs;
 
     PROCESSENTRY32 entry;
     entry.dwSize = sizeof(PROCESSENTRY32);
@@ -825,7 +825,7 @@ std::string Services::GetProcessDirectory(__in const DWORD pid)
 /*
     GetProcessDirectoryW - return directory of process `pid`
 */
-wstring Services::GetProcessDirectoryW(__in const DWORD pid)
+std::wstring Services::GetProcessDirectoryW(__in const DWORD pid)
 {
     if (pid <= 4)
         return L"";
