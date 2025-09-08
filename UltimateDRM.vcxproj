@@ -29,6 +29,8 @@
     <ClCompile Include="src\remap.cpp" />
     <ClCompile Include="src\Services.cpp" />
     <ClCompile Include="src\Thread.cpp" />
+    <ClCompile Include="src\TwoFish\CryptMgrTwoFish.cpp" />
+    <ClCompile Include="src\TwoFish\cryptmgr_twofish_impl.c" />
     <ClCompile Include="src\UltimateDRM.cpp" />
     <ClCompile Include="src\Utility.cpp" />
   </ItemGroup>
@@ -50,6 +52,8 @@
     <ClInclude Include="include\Definitions.hpp" />
     <ClInclude Include="include\EventLog.hpp" />
     <ClInclude Include="include\License.hpp" />
+    <ClInclude Include="include\TwoFish\CryptMgrTwoFish.h" />
+    <ClInclude Include="include\TwoFish\cryptmgr_twofish_impl.h" />
     <ClInclude Include="include\UltimateDRM.hpp" />
     <ClInclude Include="include\DRMException.hpp" />
     <ClInclude Include="include\HttpClient.hpp" />

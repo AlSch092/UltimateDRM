@@ -832,7 +832,7 @@ std::wstring Services::GetProcessDirectoryW(__in const DWORD pid)
 
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
 
-    if (hProcess == nullptr)
+    if (hProcess == NULL)
     {
 #ifdef _LOGGING_ENABLED
         Logger::logf(Err, "Failed to open process with PID %d @ GetProcessDirectory", pid);

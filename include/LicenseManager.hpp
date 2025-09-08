@@ -1,6 +1,8 @@
 #pragma once
 #include "HttpClient.hpp"
 #include "License.hpp"
+#include "TwoFish/CryptMgrTwoFish.h"
+#include "Utility.hpp"
 #include <wincrypt.h>
 #include <bcrypt.h>
 #include <fstream>
@@ -9,6 +11,21 @@
 #include "XorStr.hpp"
 
 #pragma comment(lib, "bcrypt.lib")
+
+enum LicenseRequestStatus
+{
+	OK = 1,
+	UNKNOWN_LEASE,
+	UNKNOWN_TOKEN,
+	LEASE_EXPIRED,
+	BANNED_MACHINE_ID,
+	INCORRECT_API_VERSION,
+	CALL_PARAMETER_ERROR,
+	JSON_ERROR,
+	REQUEST_ERROR,
+	RESPONSE_ERROR,
+	UNKNOWN_ERROR,
+};
 
 class LicenseManager final
 {
@@ -33,7 +50,9 @@ public:
 			delete[] PublicKeyY;
 	}
 
-	bool SendLicenseInfo(__in const bool bUsingEncryption, __in const std::string& machine_id, __in const std::string& software_version, __out std::string& leaseId);
+	LicenseRequestStatus ActivateLicense(__in const bool bEncryptBody, __in const std::string& machine_id, __in const std::string& software_version);
+	LicenseRequestStatus SendHeartbeat( __in const bool bEncryptBody);
+	LicenseRequestStatus DeactivateLicense(__in const bool bEncryptBody);
 
     bool VerifyLicenseJWT_ES256(__in const std::string& token);
 
@@ -59,11 +78,23 @@ public:
 
 	void SetLicenseToken(__in const std::string& jwtToken) { this->LicenseToken = jwtToken; }
 
+	//std::string GetLeaseId() const noexcept { return this->LeaseId; }
+
+	bool IsLeaseExpired() const noexcept { return GetTickCount64() >= this->LeaseExpiresAt; }
+
+	static std::string GetHardwareID();
+
 private:
 	
 	std::string LicenseToken;
 	std::string LicenseFileName;
 	std::string LicenseServerEndpoint;
+	
+	std::string LeaseId; //server gives this on successful activate
+	uint64_t LeaseAcquireTime = 0;
+	uint64_t LeaseExpiresAt = 0;
+
+	bool bEncryptRequestBodies = false;
 	bool bAllowOfflineProductUsage = false;
 
 	static bool Sha256_CNG(__in const void* data, __in  const size_t len, __out std::vector<uint8_t>& out32);

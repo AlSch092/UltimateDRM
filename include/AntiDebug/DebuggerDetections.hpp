@@ -8,9 +8,9 @@ class DebuggerDetections final  : public Debugger::AntiDebug
 public:
     DebuggerDetections(DRMSettings* s) : Debugger::AntiDebug(s)
     {
-//#ifndef _DEBUG //VS debugger messes up if threads get hidden from it
-//        HideAllThreadsFromDebugger();
-//#endif
+#ifndef _DEBUG //VS debugger hangs forever if threads get hidden from it
+        HideAllThreadsFromDebugger();
+#endif
 
         AddDetectionFunction([this]() -> DebuggerMethod { return _IsDebuggerPresent(); });
         AddDetectionFunction([this]() -> DebuggerMethod { return _IsDebuggerPresent_HeapFlags(); });

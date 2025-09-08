@@ -1,15 +1,12 @@
 #include "../include/LicenseManager.hpp"
 
-
-
-
 /**
  * @brief Checks license key online via HTTP(S)
  *
  * This function checks the local license against the license server
  * using a POST HTTP request. 
  *
- * @param bUsingEncryption If true, the HTTP post body will be encrypted
+ * @param bEncryptBody If true, the HTTP post body will be encrypted
  *
  * @return True if the license is valid, false otherwise
  *
@@ -18,16 +15,14 @@
  *  @example
  *
  * @usage
- * bool verified = LicenseManager->SendLicenseInfo(true); 
+ * bool verified = LicenseManager->ActivateLicense(true, "machine-123", "1"); 
  */
-bool LicenseManager::SendLicenseInfo(__in const bool bUsingEncryption, __in const std::string& machine_id, __in const std::string& software_version, __out std::string& leaseId)
+LicenseRequestStatus LicenseManager::ActivateLicense(__in const bool bEncryptBody, __in const std::string& machine_id, __in const std::string& software_version)
 {
-	leaseId = "";
-
 	if (this->LicenseServerEndpoint.empty() || machine_id.empty() || software_version.empty())
 	{
 		//throw std::runtime_error("License information cannot be empty @ VerifyLicenseOnline");
-		return false;
+		return LicenseRequestStatus::CALL_PARAMETER_ERROR;
 	}
 
 	std::vector<std::string> headers = 
@@ -46,37 +41,45 @@ bool LicenseManager::SendLicenseInfo(__in const bool bUsingEncryption, __in cons
 		
 	std::string requestBody = j.dump();
 
-	if (bUsingEncryption) //encrypt HTTP post body
+	if (bEncryptBody) //encrypt HTTP post body
 	{
-		//todo: twofish encryption, will add soon
-		//TwoFishEncManager enc; 
-		// requestBody = enc.Encrypt(requestBody.c_str());
+		char* buf_cpy = new char[requestBody.length() + 16] {0}; //block cipher pads to nearest 16 bytes, add extra buffer space or risk overflow
+		memcpy(buf_cpy, requestBody.data(), requestBody.length());
+		requestBody = CCryptMgrTwoFish::Encrypt(buf_cpy, requestBody.length());
 	}
 
 	HttpRequest requestInfo;
-	requestInfo.url = this->LicenseServerEndpoint + "v1/activate";
+	requestInfo.url = this->LicenseServerEndpoint + "/v1/activate";
 	requestInfo.requestHeaders = headers;
 	requestInfo.body = requestBody;
 
 	if (!HttpClient::PostRequest(requestInfo))
 	{
 #ifdef _LOGGING_ENABLED
-		std::cerr << "POST Request failed @ LicenseManager::SendLicenseInfo\n";
-		OutputDebugStringA("POST Request failed @ LicenseManager::SendLicenseInfo\n");
+		std::cerr << "POST Request failed @ LicenseManager::ActivateLicense\n";
+		OutputDebugStringA("POST Request failed @ LicenseManager::ActivateLicense\n");
 #endif
-		return false; //failed to send request
+		return LicenseRequestStatus::REQUEST_ERROR; //failed to send request
 	}
 
 	if (requestInfo.responseText.empty() || std::find(requestInfo.responseHeaders.begin(), requestInfo.responseHeaders.end(), "HTTP/1.1 200 OK\r\n") == requestInfo.responseHeaders.end())
 	{
 #ifdef _LOGGING_ENABLED
-		std::cerr << "POST Request had bad response @ LicenseManager::SendLicenseInfo\n";
-		OutputDebugStringA("POST Request had bad response @ LicenseManager::SendLicenseInfo\n");
+		std::cerr << "POST Request had bad response @ LicenseManager::ActivateLicense\n";
+		OutputDebugStringA("POST Request had bad response @ LicenseManager::ActivateLicense\n");
 #endif
-		return false;
+		return LicenseRequestStatus::RESPONSE_ERROR;
+	}
+
+	if (bEncryptBody) //decrypt http response body
+	{
+		char* buf_cpy = new char[requestInfo.responseText.length() + 16] {0}; //block cipher pads to nearest 16 bytes, add extra buffer space or risk overflow
+		memcpy(buf_cpy, requestInfo.responseText.data(), requestInfo.responseText.length());
+		requestInfo.responseText = CCryptMgrTwoFish::Decrypt(buf_cpy, requestInfo.responseText.length());
 	}
 
 	LicenseActivateResponse response;
+	
 	try
 	{
 		nlohmann::json jstxt = nlohmann::json::parse(requestInfo.responseText);
@@ -85,22 +88,228 @@ bool LicenseManager::SendLicenseInfo(__in const bool bUsingEncryption, __in cons
 	catch (...)
 	{
 #ifdef _LOGGING_ENABLED
-		std::cerr << "Parsing license response JSON failed @ SendLicenseInfo" << std::endl;
-		OutputDebugStringW(L"Parsing license response JSON failed @ SendLicenseInfo \n");
+		std::cerr << "Parsing license response JSON failed @ ActivateLicense" << std::endl;
+		OutputDebugStringW(L"Parsing license response JSON failed @ ActivateLicense \n");
 #endif
 
-		return false;
+		return LicenseRequestStatus::JSON_ERROR;
 	}
 
-	if (bUsingEncryption) //decrypt http response body
-	{
-		//todo: add twofish encryption
-	}
+	this->LeaseId = response.lease_id;
+	this->LeaseAcquireTime = GetTickCount64();
+	this->LeaseExpiresAt = GetTickCount64() + (response.lease_expires_in * 1000);
 
-	leaseId = response.lease_id;//requestInfo.responseText.substr(leaseId_pos + std::string("lease_id\":\"").size(), leaseId_end - leaseId_pos - std::string("lease_id\":\"").size());
-
-	return (response.ok && !leaseId.empty());
+	if (response.ok && !this->LeaseId.empty())
+		return LicenseRequestStatus::OK;
+	else if (this->IsLeaseExpired())
+		return LicenseRequestStatus::LEASE_EXPIRED;
+	else
+		return LicenseRequestStatus::UNKNOWN_ERROR;
 }
+
+/**
+ * @brief Logs off the leaseId associated with a license
+ *
+ * This function logs out from the leaseId using a POST HTTP request.
+ *
+ * @param bEncryptBody If true, the HTTP post body will be encrypted
+ *
+ * @return True if the request succeeded and the lease was signed off properly
+ *
+ * @details The ActivateLicense routine must be called prior to this, and have a valid `leaseId`
+ *
+ *  @example
+ *
+ * @usage
+ * bool deactivate = LicenseManager->DeactivateLicense(bEncryptBody);
+ */
+LicenseRequestStatus LicenseManager::DeactivateLicense(__in const bool bEncryptBody)
+{
+	if (this->LicenseServerEndpoint.empty() || this->LeaseId.empty())
+	{
+		//throw std::runtime_error("License information cannot be empty @ VerifyLicenseOnline");
+		return LicenseRequestStatus::CALL_PARAMETER_ERROR;
+	}
+
+	std::vector<std::string> headers =
+	{
+		"Content-Type: application/json",
+		"Accept: application/json"
+	};
+
+	LicenseDeactivateRequest request;
+	request.lease_id = this->LeaseId;
+
+	json j;
+	to_json(j, request);
+
+	std::string requestBody = j.dump();
+
+	if (bEncryptBody) //encrypt HTTP post body
+	{
+		char* buf_cpy = new char[requestBody.length() + 16] {0}; //block cipher pads to nearest 16 bytes, add extra buffer space or risk overflow
+		memcpy(buf_cpy, requestBody.data(), requestBody.length());
+		requestBody = CCryptMgrTwoFish::Encrypt(buf_cpy, requestBody.length());
+	}
+
+	HttpRequest requestInfo;
+	requestInfo.url = this->LicenseServerEndpoint + "/v1/deactivate";
+	requestInfo.requestHeaders = headers;
+	requestInfo.body = requestBody;
+
+	if (!HttpClient::PostRequest(requestInfo))
+	{
+#ifdef _LOGGING_ENABLED
+		std::cerr << "POST Request failed @ LicenseManager::DeactivateLicense\n";
+		OutputDebugStringA("POST Request failed @ LicenseManager::DeactivateLicense\n");
+#endif
+		return LicenseRequestStatus::REQUEST_ERROR; //failed to send request
+	}
+
+	if (requestInfo.responseText.empty() || std::find(requestInfo.responseHeaders.begin(), requestInfo.responseHeaders.end(), "HTTP/1.1 200 OK\r\n") == requestInfo.responseHeaders.end())
+	{
+#ifdef _LOGGING_ENABLED
+		std::cerr << "POST Request had bad response @ LicenseManager::DeactivateLicense\n";
+		OutputDebugStringA("POST Request had bad response @ LicenseManager::DeactivateLicense\n");
+#endif
+		return LicenseRequestStatus::RESPONSE_ERROR;
+	}
+
+	if (bEncryptBody) //decrypt http response body
+	{
+		char* buf_cpy = new char[requestInfo.responseText.length() + 16] {0}; //block cipher pads to nearest 16 bytes, add extra buffer space or risk overflow
+		memcpy(buf_cpy, requestInfo.responseText.data(), requestInfo.responseText.length());
+		requestInfo.responseText = CCryptMgrTwoFish::Decrypt(buf_cpy, requestInfo.responseText.length());
+	}
+
+	LicenseDeactivateResponse response;
+	try
+	{
+		nlohmann::json jstxt = nlohmann::json::parse(requestInfo.responseText);
+		jstxt.get_to(response);
+	}
+	catch (...)
+	{
+#ifdef _LOGGING_ENABLED
+		std::cerr << "Parsing license response JSON failed @ DeactivateLicense" << std::endl;
+		OutputDebugStringW(L"Parsing license response JSON failed @ DeactivateLicense \n");
+#endif
+
+		return LicenseRequestStatus::JSON_ERROR;
+	}
+
+	bool success = response.ok;//requestInfo.responseText.substr(leaseId_pos + std::string("lease_id\":\"").size(), leaseId_end - leaseId_pos - std::string("lease_id\":\"").size());
+
+	if (success)
+		return LicenseRequestStatus::OK;
+	else
+		return LicenseRequestStatus::UNKNOWN_ERROR;
+}
+
+/**
+ * @brief Sends keepalive request to the license server
+ * 
+ * @param bEncryptBody If true, the HTTP post body will be encrypted
+ *
+ * @return True if the request succeeded and the lease is valid
+ *
+ * @details The ActivateLicense routine must be called prior to this, and have a valid `leaseId`
+ *
+ * @usage
+ * bool deactivate = LicenseManager->DeactivateLicense(bEncryptBody);
+ */
+LicenseRequestStatus LicenseManager::SendHeartbeat(__in const bool bEncryptBody)
+{
+	if (this->LicenseServerEndpoint.empty() || this->LeaseId.empty())
+	{
+		return LicenseRequestStatus::CALL_PARAMETER_ERROR;
+	}
+
+	HeartbeatRequest hb;
+	hb.lease_id = this->LeaseId;
+
+	std::string msg = "Lease id (HB):" + hb.lease_id;
+	OutputDebugStringA(msg.c_str());
+
+	std::vector<std::string> headers =
+	{
+		"Content-Type: application/json",
+		"Accept: application/json"
+	};
+
+	json j;
+	to_json(j, hb);
+
+	std::string requestBody = j.dump();
+	OutputDebugStringA(requestBody.c_str());
+	HttpRequest request;
+	request.url = LicenseServerEndpoint + "/v1/heartbeat";
+	request.body = requestBody;
+	request.cookie = "";
+	request.requestHeaders = headers;
+
+	if (bEncryptBody)
+	{
+		char* buf_cpy = new char[requestBody.length() + 16] {0}; //block cipher pads to nearest 16 bytes, add extra buffer space or risk overflow
+		memcpy(buf_cpy, requestBody.data(), requestBody.length());
+		requestBody = CCryptMgrTwoFish::Encrypt(buf_cpy, requestBody.length());
+	}
+
+	if (!HttpClient::PostRequest(request))
+	{
+#ifdef _LOGGING_ENABLED
+		OutputDebugStringA("Failed to send heartbeat!\n");
+#endif
+		return LicenseRequestStatus::REQUEST_ERROR;
+	}
+
+	if (request.responseText.empty() || std::find(request.responseHeaders.begin(), request.responseHeaders.end(), "HTTP/1.1 200 OK\r\n") == request.responseHeaders.end())
+	{
+#ifdef _LOGGING_ENABLED
+		std::cerr << "POST Request had bad response @ LicenseManager::SendHeartbeat\n";
+		OutputDebugStringA("POST Request had bad response @ LicenseManager::SendHeartbeat\n");
+#endif
+		return LicenseRequestStatus::RESPONSE_ERROR;
+	}
+
+	if (bEncryptBody) //decrypt http response body
+	{
+		char* buf_cpy = new char[request.responseText.length() + 16] {0}; //block cipher pads to nearest 16 bytes, add extra buffer space or risk overflow
+		memcpy(buf_cpy, request.responseText.data(), request.responseText.length());
+		request.responseText = CCryptMgrTwoFish::Decrypt(buf_cpy, request.responseText.length());
+	}
+
+	HeartbeatResponse response;
+
+	try
+	{
+		nlohmann::json jstxt = nlohmann::json::parse(request.responseText);
+		jstxt.get_to(response);
+	}
+	catch (...)
+	{
+#ifdef _LOGGING_ENABLED
+		std::cerr << "Parsing Heartbeat response JSON failed @ SendHeartbeat" << std::endl;
+		OutputDebugStringW(L"Parsing Heartbeat response JSON failed  @ SendHeartbeat \n");
+#endif
+
+		return LicenseRequestStatus::JSON_ERROR;
+	}
+
+#ifdef _LOGGING_ENABLED
+	std::string expirymsg = "Lease expires in: " + std::to_string(response.lease_expires_in) + "\n";
+	std::string tickmsg = "GetTickCount64=" + std::to_string(GetTickCount64()) + "\n";
+	OutputDebugStringA(expirymsg.c_str());
+	OutputDebugStringA(tickmsg.c_str());
+#endif
+	if (response.ok && !this->IsLeaseExpired())
+		return LicenseRequestStatus::OK;
+	else if (this->IsLeaseExpired())
+		return LicenseRequestStatus::LEASE_EXPIRED;
+	else
+		return LicenseRequestStatus::UNKNOWN_ERROR;
+}
+
 
 /**
  * @brief Fetches a BCRYPT_KEY_HANDLE for the pinned ECDSA public key
@@ -439,4 +648,32 @@ bool LicenseManager::DerEcdsaToP1363(__in const uint8_t* der, __in const size_t 
 	};
 
 	return strip(rPtr, rLen, out64 + 0) && strip(sPtr, sLen, out64 + 32);
+}
+
+/**
+* @brief Fetches a pseudo-hardware ID for the machine
+* @details This custom hardware ID is the PC username hyphenated with the machine GUID
+*
+* @return string object of the hardware id
+*/
+std::string LicenseManager::GetHardwareID()
+{
+	wchar_t buf[256]{ 0 };
+	DWORD cb = sizeof(buf);
+	LONG rc = RegGetValueW(HKEY_LOCAL_MACHINE,
+		L"SOFTWARE\\Microsoft\\Cryptography",
+		L"MachineGuid",
+		RRF_RT_REG_SZ, nullptr, buf, &cb);
+
+	//Get computer name
+	char computerName[MAX_COMPUTERNAME_LENGTH + 1];
+	DWORD size = sizeof(computerName) / sizeof(computerName[0]);
+
+	if (!GetComputerNameA(computerName, &size))
+	{
+		strcpy_s(computerName, "UNKNOWN");
+	}
+
+	std::string result = std::string(computerName) + std::string("-") + Utility::ConvertWStringToString(buf);
+	return result;
 }

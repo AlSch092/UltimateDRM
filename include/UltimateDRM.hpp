@@ -25,7 +25,8 @@ public:
 	UltimateDRM& operator=(const UltimateDRM&) = delete;
 
 	bool CheckLicenseVerified(__in const std::string& LicenseTokenString, __in const bool bAllowOfflineLicense, __in const uint8_t* pubX, __in const uint8_t* pubY);
-	bool PushHeartbeat(__in const std::string& LicenseTokenString);
+	uint32_t PushHeartbeat(__in const bool bEncryptBody);
+	bool SignOffLicense(__in const bool bEncryptBody);
 
 private:
 	struct Impl;

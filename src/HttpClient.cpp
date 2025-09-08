@@ -31,12 +31,21 @@ bool HttpClient::GetRequest(__inout HttpRequest& requestInfo) //GET request
 
     curl_global_init(CURL_GLOBAL_DEFAULT); // Initialize libcurl
     curl = curl_easy_init();
+    curl_easy_reset(curl);
 
     struct curl_slist* request_headers = NULL;
     std::vector<std::string> response_headers;
 
     if (curl)
     {
+        curl_easy_setopt(curl, CURLOPT_POST, 0L);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, nullptr);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, 0L);
+        curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
+        curl_easy_setopt(curl, CURLOPT_NOBODY, 0L);
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, nullptr); // clear any custom verb
+        curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+
         curl_easy_setopt(curl, CURLOPT_URL, requestInfo.url.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &requestInfo.responseText);
@@ -115,11 +124,12 @@ bool HttpClient::PostRequest(__inout HttpRequest& requestInfo)
 
     curl_global_init(CURL_GLOBAL_DEFAULT);
     curl = curl_easy_init();
+    curl_easy_reset(curl);
 
     if (curl)
     {
         curl_easy_setopt(curl, CURLOPT_URL, requestInfo.url.c_str());
-
+        curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
 
         struct curl_slist* request_headers = NULL;

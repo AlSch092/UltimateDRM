@@ -87,7 +87,7 @@ struct UltimateDRM::Impl
 		{
 			if (this->Config->bUsingLicensing)
 			{
-				this->LicenseManagerPtr = std::make_unique<LicenseManager>(this->Config->LicenseServerEndpoint, this->Config->bAllowOfflineUsage, "license.json");
+				this->LicenseManagerPtr = std::make_unique<LicenseManager>(this->Config->LicenseServerEndpoint, this->Config->bAllowOfflineUsage, "license.jwt");
 			}
 
 			this->IntegrityChecker = std::make_unique<Integrity>(this->Config);
@@ -115,6 +115,11 @@ struct UltimateDRM::Impl
 
 	~Impl() 
 	{
+		if (this->Config != nullptr && this->Config->bUsingLicensing && !this->Config->bAllowOfflineUsage && this->LicenseManagerPtr != nullptr)
+		{
+			this->LicenseManagerPtr->DeactivateLicense(false);
+		}
+
 		 this->ProtectedSettings->Reset();
 		 delete this->ProtectedSettings;
 	}
@@ -188,29 +193,6 @@ bool UltimateDRM::Protect()
 		Logger::logf(Err, "Could not initialize program: shared memory check failed, make sure only one instance of the program is open. Shutting down.");
 #endif
 		terminate();
-	}
-
-	if (this->pImpl->Config->bUsingLicensing)
-	{
-		if (this->pImpl->LicenseManagerPtr == nullptr)
-		{
-			throw std::runtime_error("LicenseManagerPtr is not initialized");
-		}
-
-		if (!this->pImpl->Config->bAllowOfflineUsage)
-		{
-			//if (!this->pImpl->LicenseManagerPtr->VerifyLicenseOnline(false)) //licensing is not finished yet!
-			//{
-			//	throw DRMException(DRMException::LicenseVerificationFailed);
-			//}
-		}
-		else
-		{
-			//if (!this->pImpl->LicenseManagerPtr->VerifyLicense())
-			//{
-			//	throw DRMException(DRMException::LicenseVerificationFailed);
-			//}
-		}
 	}
 
 	if (!this->pImpl->Config->lAllowedParentNames.empty()) //check parent process
@@ -380,7 +362,7 @@ bool UltimateDRM::Impl::StopMultipleProcessInstances()
 		return false;
 	}
 
-	if (*pIsRunning == 1) //duplicate instance found, these instructions can be obfuscated if desired
+	if (*pIsRunning == 1) //some other instance set the shared memory to 1, implying another UDRM instance is running
 	{
 		UnmapViewOfFile(pIsRunning);
 		CloseHandle(hSharedMemory);
@@ -435,14 +417,14 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 	case DLL_PROCESS_ATTACH:
 	{
 
-//#ifndef _DEBUG
-//		if (!Debugger::AntiDebug::HideThreadFromDebugger(GetCurrentThread())) //hide thread from debuggers, placing this in the TLS callback allows all threads to be hidden
-//		{
-//#ifdef _LOGGING_ENABLED
-//			Logger::logf(Warning, " Failed to hide thread from debugger @ TLSCallback: thread id %d\n", GetCurrentThreadId());
-//#endif
-//		}
-//#endif
+#ifndef _DEBUG
+		if (!Debugger::AntiDebug::HideThreadFromDebugger(GetCurrentThread())) //hide thread from debuggers, placing this in the TLS callback allows all threads to be hidden
+		{
+#ifdef _LOGGING_ENABLED
+			Logger::logf(Warning, " Failed to hide thread from debugger @ TLSCallback: thread id %d\n", GetCurrentThreadId());
+#endif
+		}
+#endif
 		WinVersion = Services::GetWindowsVersion();
 
 		if (WinVersion == Windows10) //Windows 11 no longer has the thread's start address on its stack when the tls callback is hit
@@ -470,14 +452,14 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 
 	case DLL_THREAD_ATTACH: //add to our thread list, or if thread is not executing valid address range, patch over execution address
 	{
-//#ifndef _DEBUG
-//		if (!Debugger::AntiDebug::HideThreadFromDebugger(GetCurrentThread())) //hide thread from debuggers, placing this in the TLS callback allows all threads to be hidden
-//		{
-//#ifdef _LOGGING_ENABLED
-//			Logger::logf(Warning, " Failed to hide thread from debugger @ TLSCallback: thread id %d\n", GetCurrentThreadId());
-//#endif
-//		}
-//#endif
+#ifndef _DEBUG
+		if (!Debugger::AntiDebug::HideThreadFromDebugger(GetCurrentThread())) //hide thread from debuggers, placing this in the TLS callback allows all threads to be hidden
+		{
+#ifdef _LOGGING_ENABLED
+			Logger::logf(Warning, " Failed to hide thread from debugger @ TLSCallback: thread id %d\n", GetCurrentThreadId());
+#endif
+		}
+#endif
 
 		if (WinVersion == WindowsVersion::Windows11) //thread start address is not on the stack in windows 11
 			return;
@@ -549,11 +531,11 @@ LONG WINAPI g_VectoredExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo)
  *  @example
  *
  * @usage
- *  bool licensed = DRM->CheckLicenseVerified("eyJhbGciOiJFUzI1NiIsImtpZCI6InYxIiwidHlwIjoiSldUIn0.eyJleHAiOjE3ODcyNzI2NDIsImZlYXR1cmV...");
+ *  bool licensed = DRM->CheckLicenseVerified("eyJhbGciOiJFUzI1NiIsImtpZCI6InYxIiwidHlwIjoiSldUIn0.eyJleHAiOjE3ODcyNzI2NDIsImZlYXR1cmV...", false, {0x12,0x34, ...}, {0xab, 0xcd, ...});
  */
 bool UltimateDRM::CheckLicenseVerified(__in const std::string& LicenseTokenString, __in const bool bAllowOfflineLicense, __in const uint8_t* pubX, __in const uint8_t* pubY)
 {
-	if (this->pImpl != nullptr && !this->pImpl->Config->bUsingLicensing)
+	if (this->pImpl != nullptr && !this->pImpl->Config->bUsingLicensing || LicenseTokenString.empty())
 	{
 		return false;
 	}
@@ -573,8 +555,7 @@ bool UltimateDRM::CheckLicenseVerified(__in const std::string& LicenseTokenStrin
 			return true;
 		else if (!bAllowOfflineLicense && bSuccess)
 		{
-			std::string lease;
-			if (!this->pImpl->LicenseManagerPtr->SendLicenseInfo(false, "AdminPC-123456", "1", lease))
+			if (!this->pImpl->LicenseManagerPtr->ActivateLicense(false, LicenseManager::GetHardwareID(), "1")) //todo: replace machineId with fetched HWID
 			{
 #ifdef _LOGGING_ENABLED
 				Logger::logf(Err, "Online license check failed!");
@@ -597,25 +578,51 @@ bool UltimateDRM::CheckLicenseVerified(__in const std::string& LicenseTokenStrin
 	return false;
 }
 
-bool UltimateDRM::PushHeartbeat(__in const std::string& LicenseTokenString)
+/**
+ * @brief Sends a keepalive to the license server
+ *
+ * @param leaseId  Lease ID which was gathered from sending the activation request
+
+ * @return true/false indicating whether the request was successful
+ *
+ * @details Should be sent one time every few minutes. 
+ *
+ *  @example
+ *
+ * @usage
+ *  bool licensed = DRM->PushHeartbeat(bShouldEncryptRequestBody);
+ */
+uint32_t UltimateDRM::PushHeartbeat(__in const bool bShouldEncryptRequestBody)
 {
-	if ((this->pImpl != nullptr && !this->pImpl->Config->bUsingLicensing) || this->pImpl == nullptr)
+	if ((this->pImpl != nullptr && !this->pImpl->Config->bUsingLicensing) || this->pImpl == nullptr || this->pImpl->LicenseManagerPtr == nullptr)
 	{
 		return false;
 	}
 
-	HttpRequest request;
-	request.url = this->pImpl->Config->LicenseServerEndpoint + "v1/heartbeat";
-	request.body = "lease_id=" + LicenseTokenString;
-	request.cookie = "";
-
-	if (!HttpClient::PostRequest(request))
-	{
-#ifdef _LOGGING_ENABLED
-		OutputDebugStringA("Failed to send heartbeat!\n");
-#endif
-		return false;
-	}
-
-	return true;
+	return this->pImpl->LicenseManagerPtr->SendHeartbeat(bShouldEncryptRequestBody);
 }
+
+/**
+ * @brief Sends a deactivate/sign off request for license
+ *
+ * @param leaseId  Lease ID which was gathered from sending the activation request
+
+ * @return true/false indicating whether the request was successful
+ *
+ * @details Should be sent one time every few minutes.
+ *
+ *  @example
+ *
+ * @usage
+ *  bool licensed = DRM->SignOffLicense(bShouldEncryptRequestBody);
+ */
+bool UltimateDRM::SignOffLicense(__in const bool bShouldEncryptRequestBody)
+{
+	if ((this->pImpl != nullptr && !this->pImpl->Config->bUsingLicensing) || this->pImpl == nullptr || this->pImpl->LicenseManagerPtr == nullptr)
+	{
+		return false;
+	}
+
+	return this->pImpl->LicenseManagerPtr->DeactivateLicense(bShouldEncryptRequestBody);
+}
+

@@ -90,7 +90,7 @@ public:
 				return j.contains(k) && !j[k].is_null(); 
 		};
 
-		// Required string fields
+		//required string fields
 		if (!req("iss") || !req("product") || !req("org") || !req("plan") || !req("jti"))
 			return LicenseStatus::MissingRequiredField;
 		
@@ -100,14 +100,14 @@ public:
 		c.plan = j.value("plan", "");
 		c.jti = j.value("jti", "");
 
-		// iat/exp required numbers
+		//iat/exp required numbers
 		if (!req("iat") || !req("exp")) 
 			return LicenseStatus::MissingRequiredField;
 
 		c.iat = j["iat"].is_number_integer() ? j["iat"].get<int64_t>() : 0;
 		c.exp = j["exp"].is_number_integer() ? j["exp"].get<int64_t>() : 0;
 
-		// features optional array
+		//optional array
 		c.features.clear();
 
 		if (j.contains("features") && j["features"].is_array()) 
@@ -117,7 +117,7 @@ public:
 				    c.features.emplace_back(f.get<std::string>());
 		}
 
-		// seats: can be null for "site"
+		//seats can be null
 		if (j.contains("seats") && !j["seats"].is_null()) 
 		{
 			if (!j["seats"].is_number_integer()) 
@@ -131,21 +131,18 @@ public:
 		}
 
 		// Semantic constraints from your signer:
-		// - iss == "Lighthouse"
-		if (c.iss != "Lighthouse") 
+		if (c.iss != "UltimateDRM") 
 			return LicenseStatus::WrongIssuer;
 
-		// - product == "lighthouse/agent"
-		if (c.product != "lighthouse/agent") 
+		if (c.product != "UltimateDRM/agent") 
 			return LicenseStatus::WrongProduct;
 
-		// - plan in allowed set
 		static const std::unordered_set<std::string> kPlans = { "trial", "monthly","ongoing", "infinite" };
 
 		if (!kPlans.count(c.plan)) 
 			return LicenseStatus::InvalidPlan;
 
-		// - seats rule: null for "site", present & >=1 otherwise
+		//seats rule: null for "site", present & >=1 otherwise
 		if (c.plan == "trial") 
 		{
 			if (c.seats != 1) 
@@ -286,10 +283,31 @@ struct LicenseActivateRequest
 	std::string software_version;
 };
 
+struct LicenseDeactivateRequest
+{
+	std::string lease_id;
+};
+
+struct HeartbeatRequest
+{
+	std::string lease_id;
+};
+
 struct LicenseActivateResponse
 {
 	bool ok;
 	std::string lease_id;
+	uint64_t lease_expires_in;
+};
+
+struct LicenseDeactivateResponse
+{
+	bool ok;
+};
+
+struct HeartbeatResponse
+{
+	bool ok;
 	uint64_t lease_expires_in;
 };
 
@@ -327,5 +345,55 @@ static void from_json(const nlohmann::json& j, LicenseActivateResponse& response
 {
 	j.at("ok").get_to(response.ok);
 	j.at("lease_id").get_to(response.lease_id);
+	j.at("lease_expires_in").get_to(response.lease_expires_in);
+}
+
+static void to_json(json& j, const LicenseDeactivateRequest& request)
+{
+	j = json{
+			{"lease_id", request.lease_id}
+	};
+}
+
+static inline void from_json(const nlohmann::json& j, LicenseDeactivateRequest& request)
+{
+	if (j.contains("lease_id") && !j["lease_id"].is_null())
+		j["lease_id"].get_to(request.lease_id);
+}
+
+static void to_json(json& j, const LicenseDeactivateResponse& response)
+{
+	j = json{
+			{"ok", response.ok}
+	};
+}
+
+static void from_json(const nlohmann::json& j, LicenseDeactivateResponse& response)
+{
+	j.at("ok").get_to(response.ok);
+}
+
+static void to_json(json& j, const HeartbeatRequest& request)
+{
+	j = json{
+			{"lease_id", request.lease_id}
+	};
+}
+
+static inline void from_json(const nlohmann::json& j, HeartbeatRequest& request)
+{
+	if (j.contains("lease_id") && !j["lease_id"].is_null())
+		j["lease_id"].get_to(request.lease_id);
+}
+
+static void to_json(json& j, const HeartbeatResponse& response)
+{
+	j = json{ {"ok", response.ok}, {"lease_expires_in", response.lease_expires_in}
+	};
+}
+
+static void from_json(const nlohmann::json& j, HeartbeatResponse& response)
+{
+	j.at("ok").get_to(response.ok);
 	j.at("lease_expires_in").get_to(response.lease_expires_in);
 }
