@@ -62,7 +62,7 @@ public:
 };
 
 template <std::size_t N>
-constexpr EncryptedString<N> make_encrypted(const char(&str)[N]) 
+constexpr EncryptedString<N> make_encrypted(const char(&str)[N])  //factory method
 {
     return EncryptedString<N>(str);
 }

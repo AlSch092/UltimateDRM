@@ -782,7 +782,7 @@ std::string Services::GetProcessDirectory(__in const DWORD pid)
     if (pid <= 4)
         return "";
 
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
     if (hProcess == nullptr)
     {
 #ifdef _LOGGING_ENABLED
@@ -830,7 +830,7 @@ std::wstring Services::GetProcessDirectoryW(__in const DWORD pid)
     if (pid <= 4)
         return L"";
 
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
 
     if (hProcess == NULL)
     {

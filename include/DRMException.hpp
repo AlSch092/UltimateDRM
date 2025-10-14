@@ -18,6 +18,7 @@ public:
 	{
 		UnknownError = 0,
 		GenericError,
+		SettingsError,
 		LicenseVerificationFailed,
 		HypervisorDetected,
 		CodeSigningFailed,
@@ -43,6 +44,7 @@ private:
 	{
         { UnknownError, "Unknown Error" },
 		{ GenericError, "Generic error related to memory or information querying" },
+		{ SettingsError, "Settings object was not initialized properly" },
 		{ LicenseVerificationFailed, "License verification failed" },
 		{ HypervisorDetected, "Hypervisor detected" },
 		{ CodeSigningFailed, "Code signing verification failed" },

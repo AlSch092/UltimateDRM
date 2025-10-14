@@ -131,10 +131,10 @@ public:
 		}
 
 		// Semantic constraints from your signer:
-		if (c.iss != "UltimateDRM") 
+		if (c.iss != "Lighthouse") 
 			return LicenseStatus::WrongIssuer;
 
-		if (c.product != "UltimateDRM/agent") 
+		if (c.product != "Lighthouse/agent") 
 			return LicenseStatus::WrongProduct;
 
 		static const std::unordered_set<std::string> kPlans = { "trial", "monthly","ongoing", "infinite" };

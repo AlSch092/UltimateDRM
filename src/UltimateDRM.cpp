@@ -198,19 +198,20 @@ bool UltimateDRM::Protect()
 	if (!this->pImpl->Config->lAllowedParentNames.empty()) //check parent process
 	{
 		bool verifiedParent = false;
+
 		DWORD parentPid = Process::GetParentProcessId();
+
+		std::wstring parentProcName = Process::GetProcessName(parentPid);
 
 		for (std::wstring parent : this->pImpl->Config->lAllowedParentNames) 	//check parent process name, then check code signing cert
 		{
-			std::wstring parentProcName = Process::GetProcessName(parentPid);
-
-			if (parentProcName != parent)
+			if(!Utility::wcscmp_insensitive(parentProcName.c_str(), parent.c_str()))
 				continue;
-
-			std::wstring parentProcDirectory = Services::GetProcessDirectoryW(parentPid);
 
 			if (this->pImpl->Config->bRequireCodeSigning)
 			{
+				std::wstring parentProcDirectory = Services::GetProcessDirectoryW(parentPid);
+
 				if (!Authenticode::HasSignature(std::wstring(parentProcDirectory + parentProcName).c_str(), TRUE))
 				{
 #ifdef _LOGGING_ENABLED
@@ -236,14 +237,21 @@ bool UltimateDRM::Protect()
 #ifdef _LOGGING_ENABLED
 			Logger::logf(Err, "Could not initialize program: Parent process is not allowed or does not have a valid code signature");
 #endif
-			throw DRMException::BadParentProcess;
+			throw DRMException::SettingsError;
 		}
 	}
-
+	else
+	{
+#ifdef _LOGGING_ENABLED
+		Logger::logf(Err, "Could not initialize program: Allowed parent process list was empty");
+#endif
+		throw DRMException::GenericError;
+	}
+	
 	if (this->pImpl->Config->bCheckIntegrity)
 	{
 #ifdef _M_X64
-#ifdef _TARGET_STATIC_LIB //if this lib is used in a .DLL to remap a host process (.exe) module, it will crash. need to debug it further (still works to compile this .lib into a .exe and remap)
+#ifdef _TARGET_STATIC_LIB //Defined in UltimateDRM.hpp -> if this lib is used in a .DLL to remap a host process (.exe) module, it will crash. need to debug it further (still works to compile this .lib into a .exe and remap)
 #ifndef _DEBUG  //todo: check if currently in .dll or .lib linked
 		if (!RmpRemapImage((ULONG_PTR)GetModuleHandleA(NULL))) //possibly  causes Defender false positive? Debug compilation does not throw false positive, where this is excluded
 		{
@@ -481,7 +489,7 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
 			}
 		}
 
-		*(uintptr_t*)stackThreadStartSlot = (uintptr_t)&ExitThreadGracefully;
+		*(uintptr_t*)stackThreadStartSlot = (uintptr_t)&ExitThreadGracefully; //point the thread's start address to an empty function
 				
 	}break;
 
@@ -502,15 +510,12 @@ void NTAPI __stdcall TLSCallback(PVOID pHandle, DWORD dwReason, PVOID Reserved)
  *
  * @details Certain unhandled exceptions might be indicative of tampering
  *
- *  @example
- *
  * @usage
  *  AddVectoredExceptionHandler(1, g_VectoredExceptionHandler)
  */
 LONG WINAPI g_VectoredExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo)
 {
 	DWORD exceptionCode = ExceptionInfo->ExceptionRecord->ExceptionCode;
-
 #ifdef _LOGGING_ENABLED
 	Logger::logf(Err, "Vectored Exception Handler at %llX called with exception code : 0x%08X\n", ExceptionInfo->ExceptionRecord->ExceptionAddress, exceptionCode);
 #endif
